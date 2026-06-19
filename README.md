@@ -25,9 +25,12 @@ Grab a build from the [**Releases**](../../releases) page:
 | **C** | Craft menu |
 | **I** | Inventory (drop items, equip tools/weapons) |
 | **E** | Eat · **Q** | Drink |
-| **O** | Options — window size (1280×720 / 1600×900 / 1920×1080 / 2560×1440) + fullscreen |
 
-The whole view scales to fit the window, so any size keeps the same layout.
+The game opens on a title menu (**Start / Load / New Game**, **Settings**, **Quit**).
+In game, the left panel has **Save Game**, **Settings**, and **Main Menu** buttons.
+**Settings** lists the controls and the video options — window size
+(1280×720 / 1600×900 / 1920×1080 / 2560×1440) + fullscreen. The whole view scales
+to fit the window, so any size keeps the same layout.
 
 ## The loop
 

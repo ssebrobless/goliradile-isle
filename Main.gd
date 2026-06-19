@@ -586,9 +586,24 @@ var _decay_timer: float = 0.0
 var _juice_spoil_t: float = 0.0    # loose cup-of-juice spoilage timer
 var _inv_open: bool = false        # inventory-management panel toggle (key I)
 var _craft_open: bool = false      # crafting panel toggle (key C)
-var _options_open: bool = false    # options/resolution panel toggle (key O)
 # Window-size presets (all 16:9 to match the canvas, so no letterboxing).
 const WINDOW_SIZES := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
+
+# --- Title screen / menu state -----------------------------------------------
+enum AppState { SPLASH, MENU, SETTINGS, PLAYING }
+const GAME_SAVE_PATH := "user://goliradile_isle_game.save"
+const SPLASH_HOLD := 1.8            # seconds the "For William." card holds before fading
+const SPLASH_FADE := 1.1            # fade-out duration
+var _app_state: int = AppState.PLAYING   # PLAYING by default so --selftest/--shot bypass the menu
+var _splash_t: float = 0.0
+var _settings_return: int = AppState.MENU  # where the Settings overlay returns to
+var _menu_layer: CanvasLayer
+var _splash_root: Control
+var _menu_root: Control
+var _settings_root: Control
+var _confirm_root: Control
+var _menu_btns: VBoxContainer
+var _lbl_menu_best: Label
 var _barrels := {}                 # idx -> {kind:"water"|"juice"|"wine"|"", amount:int, ferment:float}
 var _juicers := {}                 # idx -> {juice:int, conv:float}
 var _planters := {}                # idx -> {planted:bool, berries:int, grow:float, wet:float}
@@ -736,6 +751,7 @@ func _ready() -> void:
 
 	_build_ui()
 	_build_fx()
+	_build_menu_layer()
 	_apply_daylight()
 	_update_status()
 	_refresh_context_panel()
@@ -745,8 +761,20 @@ func _ready() -> void:
 		return
 	_handle_shot_arg()
 
+	# Normal launch (no headless test / screenshot args): open with the
+	# "For William." card, then fade into the main menu.
+	if not ("--shot" in OS.get_cmdline_user_args()):
+		_enter_splash()
+
 
 func _process(delta: float) -> void:
+	# Title / menu / settings: gameplay is paused behind the overlay.
+	if _app_state == AppState.SPLASH:
+		_tick_splash(delta)
+		return
+	if _app_state != AppState.PLAYING:
+		return
+
 	# Level-up choice freezes the world until the player spends their point.
 	if _choosing_levelup:
 		_update_status()
@@ -2319,6 +2347,9 @@ func _reset_game() -> void:
 # Build-mode input and mouse
 # -----------------------------------------------------------------------------
 func _input(event: InputEvent) -> void:
+	# Menu / splash / settings consume their own GUI input; ignore gameplay keys.
+	if _app_state != AppState.PLAYING:
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		var kc := (event as InputEventKey).keycode
 		# Pending level-up choice eats number keys 1-5.
@@ -2350,7 +2381,6 @@ func _input(event: InputEvent) -> void:
 			if _inv_open:
 				_build_mode = false
 				_craft_open = false
-				_options_open = false
 				_close_storage()
 			_refresh_context_panel()
 			queue_redraw()
@@ -2360,17 +2390,6 @@ func _input(event: InputEvent) -> void:
 			if _craft_open:
 				_build_mode = false
 				_inv_open = false
-				_options_open = false
-				_close_storage()
-			_refresh_context_panel()
-			queue_redraw()
-		elif kc == KEY_O:
-			# Toggle the options/resolution panel.
-			_options_open = not _options_open
-			if _options_open:
-				_build_mode = false
-				_inv_open = false
-				_craft_open = false
 				_close_storage()
 			_refresh_context_panel()
 			queue_redraw()
@@ -3954,7 +3973,36 @@ func _build_ui() -> void:
 	hint.add_theme_font_size_override("font_size", 13)
 	left_vbox.add_child(hint)
 
+	left_vbox.add_child(_sep())
+	var save_btn := Button.new()
+	save_btn.text = "Save Game"
+	save_btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	save_btn.pressed.connect(_on_save_pressed)
+	left_vbox.add_child(save_btn)
+	var settings_btn := Button.new()
+	settings_btn.text = "Settings"
+	settings_btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	settings_btn.pressed.connect(_open_settings.bind(AppState.PLAYING))
+	left_vbox.add_child(settings_btn)
+	var menu_btn := Button.new()
+	menu_btn.text = "Main Menu"
+	menu_btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu_btn.pressed.connect(_return_to_menu)
+	left_vbox.add_child(menu_btn)
+
 	_right_vbox = _make_panel(layer, false)
+
+
+func _on_save_pressed() -> void:
+	_save_game()
+	_set_msg("Game saved.")
+	_update_status()
+
+
+func _return_to_menu() -> void:
+	# Step out to the title menu (manual save is the player's responsibility).
+	_app_state = AppState.MENU
+	_enter_menu()
 
 
 func _build_fx() -> void:
@@ -4159,8 +4207,6 @@ func _refresh_context_panel() -> void:
 
 	if _choosing_levelup:
 		_build_levelup_panel()
-	elif _options_open:
-		_build_options_panel()
 	elif _craft_open:
 		_build_craft_panel()
 	elif _inv_open:
@@ -4178,27 +4224,6 @@ func _refresh_context_panel() -> void:
 
 
 # --- Options / window resolution ---------------------------------------------
-func _build_options_panel() -> void:
-	_right_vbox.add_child(_header("OPTIONS"))
-	_right_vbox.add_child(_label("Window size:"))
-	_right_vbox.add_child(_sep())
-	for sz in WINDOW_SIZES:
-		var b := Button.new()
-		b.text = "%d x %d" % [sz.x, sz.y]
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.pressed.connect(_set_window_size.bind(sz))
-		_right_vbox.add_child(b)
-	var fb := Button.new()
-	fb.text = "Fullscreen"
-	fb.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	fb.pressed.connect(_set_fullscreen)
-	_right_vbox.add_child(fb)
-	_right_vbox.add_child(_sep())
-	_right_vbox.add_child(_label("The whole view scales to fit, so"))
-	_right_vbox.add_child(_label("the layout stays identical."))
-	_right_vbox.add_child(_label("[O] close"))
-
-
 func _set_window_size(sz: Vector2i) -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(sz)
@@ -4209,6 +4234,394 @@ func _set_window_size(sz: Vector2i) -> void:
 
 func _set_fullscreen() -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+
+
+# -----------------------------------------------------------------------------
+# Title screen, main menu, settings overlay, and game save/load
+# -----------------------------------------------------------------------------
+func _build_menu_layer() -> void:
+	_menu_layer = CanvasLayer.new()
+	_menu_layer.layer = 100   # above everything (panels are layer 10)
+	_menu_layer.visible = false
+	add_child(_menu_layer)
+
+	# Splash card: opaque black with a centred dedication.
+	_splash_root = _overlay_root(1.0)
+	var splash_box := _center_box(_splash_root)
+	var dedication := Label.new()
+	dedication.text = "For William."
+	dedication.add_theme_font_size_override("font_size", 52)
+	dedication.add_theme_color_override("font_color", Color(0.95, 0.95, 0.97))
+	dedication.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	splash_box.add_child(dedication)
+	_menu_layer.add_child(_splash_root)
+
+	# Main menu.
+	_menu_root = _overlay_root(1.0)
+	var menu_box := _center_box(_menu_root)
+	var mtitle := Label.new()
+	mtitle.text = "GOLIRADILE ISLE"
+	mtitle.add_theme_font_size_override("font_size", 46)
+	mtitle.add_theme_color_override("font_color", UI_ACCENT)
+	mtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu_box.add_child(mtitle)
+	var msub := Label.new()
+	msub.text = "a gorilla-versus-crocodile survival island"
+	msub.add_theme_font_size_override("font_size", 16)
+	msub.add_theme_color_override("font_color", Color(0.7, 0.74, 0.8))
+	msub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu_box.add_child(msub)
+	menu_box.add_child(_spacer(18))
+	_menu_btns = VBoxContainer.new()
+	_menu_btns.alignment = BoxContainer.ALIGNMENT_CENTER
+	_menu_btns.add_theme_constant_override("separation", 10)
+	menu_box.add_child(_menu_btns)
+	menu_box.add_child(_spacer(14))
+	_lbl_menu_best = Label.new()
+	_lbl_menu_best.add_theme_font_size_override("font_size", 15)
+	_lbl_menu_best.add_theme_color_override("font_color", Color(0.6, 0.65, 0.72))
+	_lbl_menu_best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu_box.add_child(_lbl_menu_best)
+	_menu_layer.add_child(_menu_root)
+
+	# Confirm dialog (for New Game), shown over the menu.
+	_confirm_root = _overlay_root(0.95)
+	_confirm_root.visible = false
+	var cbox := _center_box(_confirm_root)
+	var cq := Label.new()
+	cq.text = "Start a NEW GAME?\nYour saved game will be erased."
+	cq.add_theme_font_size_override("font_size", 22)
+	cq.add_theme_color_override("font_color", Color(0.95, 0.9, 0.8))
+	cq.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cbox.add_child(cq)
+	cbox.add_child(_spacer(16))
+	cbox.add_child(_menu_button("Yes, erase and start fresh", _confirm_new_game))
+	cbox.add_child(_menu_button("Cancel", _cancel_new_game))
+	_menu_layer.add_child(_confirm_root)
+
+	# Settings overlay (controls + video), reachable from menu and in-game.
+	_settings_root = _overlay_root(0.96)
+	var sbox := _center_box(_settings_root)
+	var stitle := Label.new()
+	stitle.text = "SETTINGS"
+	stitle.add_theme_font_size_override("font_size", 40)
+	stitle.add_theme_color_override("font_color", UI_ACCENT)
+	stitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sbox.add_child(stitle)
+	sbox.add_child(_spacer(10))
+	sbox.add_child(_settings_label("CONTROLS", 22, UI_ACCENT))
+	for line in [
+		"WASD - move          Left-click - gather / punch (aim at cursor)",
+		"B build   C craft   I inventory   E eat   Q drink",
+		"Save Game / Settings / Main Menu - buttons on the left panel",
+	]:
+		sbox.add_child(_settings_label(line, 16, Color(0.9, 0.92, 0.95)))
+	sbox.add_child(_spacer(14))
+	sbox.add_child(_settings_label("VIDEO", 22, UI_ACCENT))
+	sbox.add_child(_settings_label("Window size (the whole view scales to fit):", 16, Color(0.9, 0.92, 0.95)))
+	var sizes_row := HBoxContainer.new()
+	sizes_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	sizes_row.add_theme_constant_override("separation", 8)
+	for sz in WINDOW_SIZES:
+		var b := Button.new()
+		b.text = "%d x %d" % [sz.x, sz.y]
+		b.pressed.connect(_set_window_size.bind(sz))
+		sizes_row.add_child(b)
+	var fb := Button.new()
+	fb.text = "Fullscreen"
+	fb.pressed.connect(_set_fullscreen)
+	sizes_row.add_child(fb)
+	sbox.add_child(sizes_row)
+	sbox.add_child(_spacer(18))
+	sbox.add_child(_menu_button("Back", _close_settings))
+	_menu_layer.add_child(_settings_root)
+
+
+func _overlay_root(dim: float) -> Control:
+	# A full-screen control with a (semi-)opaque black backing that eats clicks,
+	# so nothing behind the overlay receives input.
+	var root := Control.new()
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	var bg := ColorRect.new()
+	bg.color = Color(0.04, 0.05, 0.07, dim)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(bg)
+	return root
+
+
+func _center_box(parent: Control) -> VBoxContainer:
+	# A CenterContainer (filling `parent`) holding a centred VBox, returned for content.
+	var cc := CenterContainer.new()
+	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	parent.add_child(cc)
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 6)
+	cc.add_child(box)
+	return box
+
+
+func _spacer(h: int) -> Control:
+	var s := Control.new()
+	s.custom_minimum_size = Vector2(0, h)
+	return s
+
+
+func _settings_label(text: String, size: int, color: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return l
+
+
+func _menu_button(text: String, cb: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = Vector2(300, 46)
+	b.add_theme_font_size_override("font_size", 20)
+	b.pressed.connect(cb)
+	return b
+
+
+# --- State transitions -------------------------------------------------------
+func _set_overlay(mode: String) -> void:
+	_menu_layer.visible = mode != "none"
+	_splash_root.visible = mode == "splash"
+	_menu_root.visible = mode == "menu"
+	_settings_root.visible = mode == "settings"
+	if mode != "menu":
+		_confirm_root.visible = false
+
+
+func _enter_splash() -> void:
+	_app_state = AppState.SPLASH
+	_splash_t = 0.0
+	_splash_root.modulate.a = 1.0
+	_set_overlay("splash")
+
+
+func _tick_splash(delta: float) -> void:
+	_splash_t += delta
+	if _splash_t >= SPLASH_HOLD:
+		var fade := (_splash_t - SPLASH_HOLD) / SPLASH_FADE
+		_splash_root.modulate.a = clampf(1.0 - fade, 0.0, 1.0)
+		if fade >= 1.0:
+			_enter_menu()
+
+
+func _enter_menu() -> void:
+	_app_state = AppState.MENU
+	_refresh_menu()
+	_set_overlay("menu")
+
+
+func _refresh_menu() -> void:
+	for c in _menu_btns.get_children():
+		_menu_btns.remove_child(c)
+		c.queue_free()
+	var has_save := FileAccess.file_exists(GAME_SAVE_PATH)
+	if has_save:
+		_menu_btns.add_child(_menu_button("Load Game", _menu_load))
+		_menu_btns.add_child(_menu_button("New Game", _menu_new_game))
+	else:
+		_menu_btns.add_child(_menu_button("Start Game", _menu_start))
+	_menu_btns.add_child(_menu_button("Settings", _open_settings.bind(AppState.MENU)))
+	_menu_btns.add_child(_menu_button("Quit Game", _menu_quit))
+	_lbl_menu_best.text = "Best nights survived: %d" % _best_nights
+
+
+func _menu_start() -> void:
+	_reset_game()
+	_enter_playing()
+
+
+func _menu_load() -> void:
+	if not _load_game():
+		_reset_game()
+	_enter_playing()
+
+
+func _menu_new_game() -> void:
+	_confirm_root.visible = true
+
+
+func _confirm_new_game() -> void:
+	_delete_save()
+	_reset_game()
+	_enter_playing()
+
+
+func _cancel_new_game() -> void:
+	_confirm_root.visible = false
+
+
+func _menu_quit() -> void:
+	get_tree().quit()
+
+
+func _open_settings(return_state: int) -> void:
+	_settings_return = return_state
+	_app_state = AppState.SETTINGS
+	_set_overlay("settings")
+
+
+func _close_settings() -> void:
+	if _settings_return == AppState.PLAYING:
+		_enter_playing()
+	else:
+		_enter_menu()
+
+
+func _enter_playing() -> void:
+	_app_state = AppState.PLAYING
+	_set_overlay("none")
+	_refresh_context_panel()
+	_update_status()
+	queue_redraw()
+
+
+# --- Full game-state save / load ---------------------------------------------
+func _delete_save() -> void:
+	var dir := DirAccess.open("user://")
+	if dir and dir.file_exists("goliradile_isle_game.save"):
+		dir.remove("goliradile_isle_game.save")
+
+
+func _has_game_save() -> bool:
+	return FileAccess.file_exists(GAME_SAVE_PATH)
+
+
+func _serialize_state() -> Dictionary:
+	return {
+		"v": 1,
+		"seed": _seed,
+		"terrain": _terrain, "banana": _banana, "berry": _berry, "growth": _growth,
+		"block_count": _block_count,
+		"cell": _cell, "facing": _facing, "player_pos": _player_pos,
+		"health": _health, "energy": _energy, "hydration": _hydration, "lives": _lives,
+		"level": _level, "xp": _xp, "xp_to_next": _xp_to_next,
+		"nights": _nights_survived, "stat_points": _stat_points, "alloc": _alloc,
+		"tool": _tool_equipped, "weapon": _weapon_equipped, "gear_armor": _gear_armor,
+		"resources": _resources,
+		"time": _time, "day": _day, "banana_timer": _banana_timer, "is_night": _is_night,
+		"barrels": _barrels, "juicers": _juicers, "planters": _planters, "lamps": _lamps,
+		"kilns": _kilns, "apiaries": _apiaries, "wormfarms": _wormfarms, "campfires": _campfires,
+		"stills": _stills, "generators": _generators, "sprinklers": _sprinklers,
+		"aquariums": _aquariums, "fish": _fish, "monsters": _monsters,
+		"projectiles": _projectiles, "poison_clouds": _poison_clouds,
+		"night_snapshot": _night_snapshot, "struct_hp": _struct_hp, "turrets": _turrets,
+		"trap_cd": _trap_cd, "traps": _traps, "peels": _peels, "storage": _storage,
+		"burn_t": _burn_t, "slow_t": _slow_t, "freeze_t": _freeze_t,
+		"snow_count": _snow_count, "snow_window": _snow_window,
+		"best_nights": _best_nights,
+	}
+
+
+func _save_game() -> bool:
+	var f := FileAccess.open(GAME_SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_var(_serialize_state())
+	f.close()
+	return true
+
+
+func _load_game() -> bool:
+	if not FileAccess.file_exists(GAME_SAVE_PATH):
+		return false
+	var f := FileAccess.open(GAME_SAVE_PATH, FileAccess.READ)
+	if f == null:
+		return false
+	var data: Variant = f.get_var()
+	f.close()
+	if not (data is Dictionary):
+		return false
+	_deserialize_state(data as Dictionary)
+	return true
+
+
+func _deserialize_state(d: Dictionary) -> void:
+	_seed = int(d.get("seed", _seed))
+	if d.has("terrain"): _terrain = d["terrain"]
+	if d.has("banana"): _banana = d["banana"]
+	if d.has("berry"): _berry = d["berry"]
+	if d.has("growth"): _growth = d["growth"]
+	_block_count = int(d.get("block_count", 0))
+	_cell = d.get("cell", _cell)
+	_facing = d.get("facing", _facing)
+	_player_pos = d.get("player_pos", _cell_center_world(_cell))
+	_health = float(d.get("health", HEALTH_MAX))
+	_energy = float(d.get("energy", ENERGY_MAX))
+	_hydration = float(d.get("hydration", HYDRATION_MAX))
+	_lives = int(d.get("lives", MAX_LIVES))
+	_level = int(d.get("level", 1))
+	_xp = int(d.get("xp", 0))
+	_xp_to_next = int(d.get("xp_to_next", _xp_needed(_level)))
+	_nights_survived = int(d.get("nights", 0))
+	_stat_points = int(d.get("stat_points", 0))
+	_alloc = d.get("alloc", {"health": 0, "attack": 0, "speed": 0, "armor": 0, "regen": 0})
+	_tool_equipped = String(d.get("tool", ""))
+	_weapon_equipped = String(d.get("weapon", ""))
+	_gear_armor = float(d.get("gear_armor", 0.0))
+	_resources = d.get("resources", _default_inventory())
+	_time = float(d.get("time", 0.30))
+	_day = int(d.get("day", 1))
+	_banana_timer = float(d.get("banana_timer", 0.0))
+	_is_night = bool(d.get("is_night", false))
+	_barrels = d.get("barrels", {})
+	_juicers = d.get("juicers", {})
+	_planters = d.get("planters", {})
+	_lamps = d.get("lamps", {})
+	_kilns = d.get("kilns", {})
+	_apiaries = d.get("apiaries", {})
+	_wormfarms = d.get("wormfarms", {})
+	_campfires = d.get("campfires", {})
+	_stills = d.get("stills", {})
+	_generators = d.get("generators", {})
+	_sprinklers = d.get("sprinklers", {})
+	_aquariums = d.get("aquariums", {})
+	_fish = d.get("fish", [])
+	_monsters = d.get("monsters", [])
+	_projectiles = d.get("projectiles", [])
+	_poison_clouds = d.get("poison_clouds", [])
+	_night_snapshot = d.get("night_snapshot", {})
+	_struct_hp = d.get("struct_hp", {})
+	_turrets = d.get("turrets", {})
+	_trap_cd = d.get("trap_cd", {})
+	_traps = d.get("traps", {})
+	_peels = d.get("peels", [])
+	_storage = d.get("storage", {})
+	_burn_t = float(d.get("burn_t", 0.0))
+	_slow_t = float(d.get("slow_t", 0.0))
+	_freeze_t = float(d.get("freeze_t", 0.0))
+	_snow_count = int(d.get("snow_count", 0))
+	_snow_window = float(d.get("snow_window", 0.0))
+	_best_nights = int(d.get("best_nights", _best_nights))
+
+	# Derived / transient state rebuilt from the restored world.
+	_energized = {}
+	_watered = {}
+	_compute_pool_shore()
+	_recompute_player_stats()
+	_inv_open = false
+	_craft_open = false
+	_build_mode = false
+	_build_struct = ""
+	_dragging = false
+	_drag_action = BuildAction.NONE
+	_open_storage = -1
+	_open_util = -1
+	_open_turret = -1
+	_choosing_levelup = false
+	_punch_active = false
+	_player_kb = Vector2.ZERO
+	if _camera:
+		_camera.position = _player_pos
+	_apply_daylight()
 
 
 func _build_util_panel(idx: int) -> void:
@@ -4606,7 +5019,7 @@ func _build_help_panel() -> void:
 			"Left-click  -  PUNCH (aim at",
 			"            cursor); click storage",
 			"E eat   Q drink   I inventory",
-			"O options / window size",
+			"Save / Settings: left panel",
 		]
 	else:
 		lines = [
@@ -4616,7 +5029,7 @@ func _build_help_panel() -> void:
 			"   or open storage/barrel/etc.",
 			"E eat   Q drink",
 			"B build   C craft   I inventory",
-			"O options / window size",
+			"Save / Settings: left panel",
 		]
 	for line in lines:
 		_right_vbox.add_child(_label(line))
@@ -6771,6 +7184,60 @@ func _run_selftest() -> void:
 	_turrets.clear(); _monsters = []; _ground_items = []; _is_night = false
 	_nights_survived = 0; _init_progression(); _day = 1; _resources = _default_inventory()
 
+	# --- Save / load round-trip (world + player + base machines + storage) ---
+	_reset_game()
+	_resources["wood"] = 42
+	_set_terrain(_cell + Vector2i(3, 0), Terrain.STORAGE)
+	var sl_sidx := _cell_index(_cell + Vector2i(3, 0))
+	_storage[sl_sidx] = {"wood": 7}
+	_day = 4; _nights_survived = 3; _level = 5; _xp = 9
+	_set_terrain(_cell + Vector2i(2, 0), Terrain.TURRET)
+	var sl_tcell := _cell_index(_cell + Vector2i(2, 0))
+	_turrets[sl_tcell] = _new_turret(_cell + Vector2i(2, 0))
+	_configure_turret(sl_tcell, "sniper")
+	var sl_snap := _serialize_state()
+	# Exercise real Variant disk (de)serialization via a throwaway temp path,
+	# so the player's actual save is never touched by the test.
+	var sl_tmp := "user://__selftest_roundtrip.save"
+	var sl_wf := FileAccess.open(sl_tmp, FileAccess.WRITE); sl_wf.store_var(sl_snap); sl_wf.close()
+	var sl_rf := FileAccess.open(sl_tmp, FileAccess.READ); var sl_back: Variant = sl_rf.get_var(); sl_rf.close()
+	var sl_dir := DirAccess.open("user://")
+	if sl_dir: sl_dir.remove("__selftest_roundtrip.save")
+	var ok_ser: bool = sl_back is Dictionary
+	# Scramble the live state, then restore from the round-tripped copy.
+	_resources["wood"] = 0; _day = 99; _nights_survived = 0; _level = 1; _turrets.clear(); _storage.clear()
+	if ok_ser: _deserialize_state(sl_back as Dictionary)
+	var ok_round: bool = ok_ser and _resources["wood"] == 42 and _day == 4 and _nights_survived == 3 \
+		and _level == 5 and _turrets.has(sl_tcell) and String(_turrets[sl_tcell]["type"]) == "sniper" \
+		and _storage.has(sl_sidx) and int(_storage[sl_sidx]["wood"]) == 7
+	_report("save/load round-trip restores world+player+machines", ok_round); fails += int(not ok_round)
+
+	# --- Title-screen state machine ---
+	_enter_splash()
+	var ok_splash: bool = _app_state == AppState.SPLASH and _splash_root.visible and _menu_layer.visible
+	_tick_splash(SPLASH_HOLD + SPLASH_FADE + 0.2)
+	ok_splash = ok_splash and _app_state == AppState.MENU
+	_report("splash holds then fades into the menu", ok_splash); fails += int(not ok_splash)
+
+	_enter_menu()
+	var ok_menu: bool = _app_state == AppState.MENU and _menu_root.visible and not _settings_root.visible
+	_report("main menu visible with buttons", ok_menu and _menu_btns.get_child_count() >= 3); fails += int(not (ok_menu and _menu_btns.get_child_count() >= 3))
+
+	_open_settings(AppState.MENU)
+	var ok_settings: bool = _app_state == AppState.SETTINGS and _settings_root.visible and not _menu_root.visible
+	_report("settings overlay opens from menu", ok_settings); fails += int(not ok_settings)
+	_close_settings()
+	var ok_back: bool = _app_state == AppState.MENU and _menu_root.visible
+	_report("settings Back returns to the menu", ok_back); fails += int(not ok_back)
+
+	_enter_playing()
+	var ok_play: bool = _app_state == AppState.PLAYING and not _menu_layer.visible
+	_report("entering play hides the menu layer", ok_play); fails += int(not ok_play)
+
+	_app_state = AppState.PLAYING; _set_overlay("none")
+	_turrets.clear(); _storage.clear(); _monsters = []
+	_nights_survived = 0; _init_progression(); _day = 1; _resources = _default_inventory()
+
 	print("SELFTEST DONE, failures=%d" % fails)
 	get_tree().quit()
 
@@ -6945,6 +7412,14 @@ func _handle_shot_arg() -> void:
 		if "--poolcam" in args:
 			_player_pos = _cell_center_world(Vector2i(int(POOL_CENTER.x) + 6, int(POOL_CENTER.y)))
 			_camera.position = _player_pos
+		if "--splashscreen" in args:
+			_enter_splash()
+		if "--menu" in args:
+			_enter_menu()
+		if "--settingsmenu" in args:
+			_enter_menu(); _open_settings(AppState.MENU)
+		if "--confirmnew" in args:
+			_enter_menu(); _menu_new_game()
 		for _i in range(3):
 			await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(path)
