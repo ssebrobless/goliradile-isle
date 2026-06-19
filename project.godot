@@ -1,0 +1,22 @@
+; Engine configuration file.
+; Goliradile Isle — top-down survival on a gorilla-vs-crocodile island.
+
+config_version=5
+
+[application]
+
+config/name="Goliradile Isle"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.6")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/resizable=true
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true

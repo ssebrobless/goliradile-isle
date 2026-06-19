@@ -1,0 +1,11 @@
+# Godot
+.godot/
+.import/
+
+# Build output (distributed via GitHub Releases, not committed)
+build/
+*.tmp
+
+# Logs
+_out.log
+*.log
