@@ -43,7 +43,7 @@ const ENERGY_MOVE: float = 1.5         # per second while moving
 const ENERGY_HARVEST: float = 1.5
 const ENERGY_BUILD: float = 0.5
 const EAT_RESTORE: float = 30.0
-const DAY_LENGTH: float = 120.0
+const DAY_LENGTH: float = 165.0   # longer cycle: ~117s day, night held to ~48s (see _daylight)
 const HEALTH_MAX: float = 100.0
 const HEALTH_DRAIN: float = 2.0
 const HEALTH_REGEN: float = 1.0
@@ -213,7 +213,7 @@ const MONSTER_HP: float = 4.0          # base croc health
 const PLAYER_DMG: float = 2.0          # base player attack
 const MONSTER_HIT: float = 8.0         # base croc attack
 const MONSTER_ATK_INTERVAL: float = 0.8   # seconds between a monster's attacks
-const MONSTER_BRK_INTERVAL: float = 0.6   # seconds between hits on a blocking wall
+const MONSTER_BRK_INTERVAL: float = 0.7   # seconds between hits on a blocking wall
 const ATTACK_RANGE: float = CELL_SIZE * 0.85  # monster stops & attacks within this
 const PUNCH_TIME: float = 0.3          # full out-and-back punch duration (seconds)
 const PUNCH_REACH: float = CELL_SIZE * 0.85   # how far the fist extends
@@ -467,7 +467,7 @@ const MONSTER_WALK := { Terrain.GRASS: true, Terrain.FLOOR: true, Terrain.TRAP: 
 
 # Structures monsters attack to break through, with their break HP.
 const BREAK_HP := {
-	Terrain.WOOD_WALL: 5, Terrain.STONE_WALL: 8, Terrain.DOOR: 3,
+	Terrain.WOOD_WALL: 8, Terrain.STONE_WALL: 14, Terrain.DOOR: 5,
 	Terrain.WORKBENCH: 4, Terrain.STORAGE: 4, Terrain.TURRET: 5,
 	Terrain.BARREL: 6, Terrain.JUICER: 5, Terrain.PLANTER: 5, Terrain.KILN: 7,
 	Terrain.BEE_ENCLOSURE: 5, Terrain.WORM_FARM: 5, Terrain.CAMPFIRE: 4, Terrain.STILL: 6,
@@ -516,6 +516,13 @@ const BLOCK_TERRAIN := {
 }
 # Loot lying on the ground is vacuumed up when the player wanders within this range.
 const LOOT_PICKUP_R: float = CELL_SIZE * 0.9
+# Live critters (worm/bee) need a jar to catch; if none turns up in time they
+# crawl/buzz off rather than littering the ground forever (was an endless-orb bug).
+const CRITTER_LOOT_LIFE: float = 18.0
+# Dawn re-seeding never lets wild resources exceed the world's starting density,
+# and keeps new growth this many tiles clear of anything the player has built.
+const REGROW_STRUCT_BUFFER: int = 1
+const NATURAL_BASELINE_MIN: int = 200   # fallback target if an old save lacks one
 
 # --- Colors ------------------------------------------------------------------
 const COLOR_GRID: Color = Color(0.0, 0.0, 0.0, 0.18)
@@ -627,6 +634,7 @@ var _hydration: float = HYDRATION_MAX
 var _health: float = HEALTH_MAX
 var _lives: int = MAX_LIVES
 var _seed: int = WORLD_SEED         # world seed (randomized on a fresh run)
+var _natural_baseline: int = 0      # target wild-resource tile count (set at world-gen)
 
 # Progression
 var _level: int = 1
@@ -654,6 +662,8 @@ var _day: int = 1
 var _banana_timer: float = 0.0
 var _msg: String = ""               # transient banner (death / game over)
 var _msg_timer: float = 0.0
+var _water_hint_cd: float = 0.0     # throttle for the "click water to fill a cup" hint
+var _cup_filled_once: bool = false  # once the player scoops water, stop nagging
 
 var _storage := {}
 var _open_storage: int = -1
@@ -827,6 +837,16 @@ func _process(delta: float) -> void:
 		_update_punch(delta)
 	else:
 		_world_tick(delta)
+		# Teach the non-obvious "fill a cup at the pool" step: a gentle, throttled
+		# nudge while you're standing by the water and haven't worked it out yet.
+		_water_hint_cd = maxf(0.0, _water_hint_cd - delta)
+		if _water_hint_cd <= 0.0 and _msg_timer <= 0.0 and _adjacent_to_water():
+			if _inv("cup") > 0 and not _cup_filled_once:
+				_set_msg("By the pool: left-click the water to fill your cup (Q to drink).")
+				_water_hint_cd = 8.0
+			elif _inv("cup") <= 0 and _inv("cup_water") + _inv("cup_juice") + _inv("cup_wine") == 0:
+				_set_msg("Thirsty? Craft an empty cup (C), then click the pool to fill it.")
+				_water_hint_cd = 8.0
 
 	_utility_tick(delta)   # barrels ferment, juicers press, planters grow (always)
 
@@ -903,14 +923,16 @@ func _advance_time(delta: float) -> void:
 
 
 func _daylight(f: float) -> float:
-	if f < 0.20 or f >= 0.80:
+	# Night is held to ~29% of the cycle (~48s at DAY_LENGTH 165) so lengthening the
+	# day gives more gather/build time without making nights drag on.
+	if f < 0.145 or f >= 0.855:
 		return 0.0
-	elif f < 0.30:
-		return smoothstep(0.20, 0.30, f)
-	elif f < 0.70:
+	elif f < 0.245:
+		return smoothstep(0.145, 0.245, f)
+	elif f < 0.755:
 		return 1.0
 	else:
-		return 1.0 - smoothstep(0.70, 0.80, f)
+		return 1.0 - smoothstep(0.755, 0.855, f)
 
 
 func _apply_daylight() -> void:
@@ -952,6 +974,10 @@ func _begin_day() -> void:
 		var t: int = _night_snapshot[idx]["t"]
 		if t == Terrain.STUMP or t == Terrain.SAPLING:
 			t = Terrain.TREE                       # replenish: regrow to a full tree
+		# Don't regrow a solid tile on top of the player -- that wedges them in
+		# place until they shove free. Leave it grass; it returns next dawn.
+		if not WALKABLE.has(t) and _cell_overlaps_player(_index_cell(idx)):
+			continue
 		_terrain[idx] = t
 		_growth[idx] = 0.0
 		_banana[idx] = 1 if t == Terrain.TREE else 0   # replenish bananas
@@ -962,6 +988,11 @@ func _begin_day() -> void:
 	_projectiles.clear()
 	_poison_clouds.clear()
 	_clear_status_effects()
+	# Clear stale support-turret fields: an adhesive turret's slow-zone is only laid
+	# (and only matters) at night, so it must not stay painted on the ground all day.
+	for ti in _turrets:
+		if _turrets[ti]["type"] == "adhesive":
+			_turrets[ti]["field"] = Vector2.INF
 	_punch_active = false
 	_player_kb = Vector2.ZERO
 	_refresh_context_panel()
@@ -1077,28 +1108,62 @@ func _spawn_monsters(n: int) -> void:
 		placed += 1
 
 
+# How many wild-resource tiles (trees/stone/bushes/etc.) currently exist.
+func _natural_tile_count() -> int:
+	var n := 0
+	for i in range(_terrain.size()):
+		if NATURAL.has(_terrain[i]):
+			n += 1
+	return n
+
+
+# A player-built tile is anything that isn't open grass, the pool, or wild growth.
+func _is_built(t: int) -> bool:
+	return t != Terrain.GRASS and t != Terrain.WATER and not NATURAL.has(t)
+
+
+# True if any built tile sits within `r` cells of `c` (keeps regrowth out of bases).
+func _near_structure(c: Vector2i, r: int) -> bool:
+	for oy in range(-r, r + 1):
+		for ox in range(-r, r + 1):
+			var n := c + Vector2i(ox, oy)
+			if _in_bounds(n) and _is_built(_terrain_at(n)):
+				return true
+	return false
+
+
 # Sprinkle fresh resources onto empty grass each dawn (never onto water, the
-# player, or any built structure/turret -- those tiles simply aren't grass).
+# player, the base, or any built structure -- and never past the world's starting
+# density, so the isle stays open instead of silting up into an obstacle course).
 func _regrow_world() -> void:
+	if _natural_baseline <= 0:
+		_natural_baseline = maxi(_natural_tile_count(), NATURAL_BASELINE_MIN)
+	var budget := maxi(0, _natural_baseline - _natural_tile_count())
 	var kinds := []
 	for _i in range(REGROW_TREES): kinds.append(Terrain.TREE)
 	for _i in range(REGROW_STONE): kinds.append(Terrain.STONE)
 	for _i in range(REGROW_BUSHES): kinds.append(Terrain.BUSH)
 	for _i in range(2): kinds.append(Terrain.COCONUT)
 	for _i in range(2): kinds.append(Terrain.BAMBOO)
-	kinds.append(Terrain.HIVE)
+	if randf() < 0.4: kinds.append(Terrain.HIVE)   # hives re-seed only some dawns, not every one
+	kinds.shuffle()   # so a tight budget doesn't always starve the same kinds
 	for t in kinds:
+		if budget <= 0:
+			break
 		var attempts := 0
 		while attempts < 60:
 			attempts += 1
 			var c := Vector2i(randi() % GRID_CELLS, randi() % GRID_CELLS)
 			if _terrain_at(c) != Terrain.GRASS or c == _cell:
 				continue
+			if _near_structure(c, REGROW_STRUCT_BUFFER):
+				continue
 			_set_terrain(c, t)
 			if t == Terrain.TREE or t == Terrain.COCONUT:
 				_banana[_cell_index(c)] = 1
 			elif t == Terrain.BUSH:
 				_berry[_cell_index(c)] = 1
+			budget -= 1
 			break
 	_spawn_fish_daily()    # the pool restocks with 1-4 fish each morning
 	_spawn_hive_bees()     # wild hives may loose a bee to catch
@@ -2455,6 +2520,11 @@ func _apply_build_at(c: Vector2i) -> void:
 			return
 		if _terrain_at(c) != Terrain.GRASS:
 			return
+		# Don't let the player wall themselves into a tile: refuse a solid block
+		# whose cell their body already overlaps.
+		if not WALKABLE.has(int(s["terrain"])) and _cell_overlaps_player(c):
+			_set_msg("Too close -- step back to place that.")
+			return
 		if s["bench"] and not _near_workbench():
 			return
 		# Structural blocks (walls/floors/doors) are capped; workstations/turrets exempt.
@@ -2606,6 +2676,17 @@ func _near_workbench() -> bool:
 	return false
 
 
+func _adjacent_to_water() -> bool:
+	for oy in range(-1, 2):
+		for ox in range(-1, 2):
+			if ox == 0 and oy == 0:
+				continue
+			var c := _cell + Vector2i(ox, oy)
+			if _in_bounds(c) and _terrain_at(c) == Terrain.WATER:
+				return true
+	return false
+
+
 func _can_afford(cost: Dictionary) -> bool:
 	for k in cost:
 		if _resources[k] < cost[k]:
@@ -2652,6 +2733,18 @@ func _box_blocked(center: Vector2, hs: float, walkset: Dictionary) -> bool:
 			if not walkset.has(_terrain_at(c)):
 				return true
 	return false
+
+
+# True if the player's body (a circle of PLAYER_RADIUS) overlaps cell `c`. Used
+# to avoid wedging the player inside a tile -- when dawn regrows terrain or when
+# a block is placed too close.
+func _cell_overlaps_player(c: Vector2i) -> bool:
+	var hs := PLAYER_RADIUS
+	var minx := int(floor((_player_pos.x - hs) / CELL_SIZE))
+	var maxx := int(floor((_player_pos.x + hs) / CELL_SIZE))
+	var miny := int(floor((_player_pos.y - hs) / CELL_SIZE))
+	var maxy := int(floor((_player_pos.y + hs) / CELL_SIZE))
+	return c.x >= minx and c.x <= maxx and c.y >= miny and c.y <= maxy
 
 
 func _cardinal(v: Vector2) -> Vector2i:
@@ -2751,6 +2844,7 @@ func _fill_cup_from_pool() -> void:
 	_resources["cup"] = _inv("cup") - 1
 	_resources["cup_water"] = _inv("cup_water") + 1
 	_energy = maxf(0.0, _energy - ENERGY_HARVEST * 0.5)
+	_cup_filled_once = true   # they've learned it -- drop the pool hint
 
 
 func _set_msg(text: String) -> void:
@@ -3033,12 +3127,16 @@ func _collect_ground_items(delta: float) -> void:
 	var keep := []
 	for g in _ground_items:
 		g["t"] = float(g["t"]) + delta
+		var kind: String = g["kind"]
+		# Live critters (worm/bee) wander off if not jarred in time, so unclaimed
+		# ones stop piling up on the ground forever (the "orbs never clear" bug).
+		if (kind == "worm" or kind == "bee") and float(g["t"]) >= CRITTER_LOOT_LIFE:
+			continue
 		if (g["pos"] as Vector2).distance_to(_player_pos) <= LOOT_PICKUP_R + PLAYER_RADIUS:
-			var kind: String = g["kind"]
 			# Live critters (worm/bee) can only be scooped up if you have a glass jar.
 			if kind == "worm" or kind == "bee":
 				if _inv("glass_jar") <= 0:
-					keep.append(g)   # no jar -> leave it crawling/buzzing
+					keep.append(g)   # no jar -> leave it crawling/buzzing (until it ages out)
 					continue
 				_resources["glass_jar"] = _inv("glass_jar") - 1
 			if kind in INV_ORDER:
@@ -3800,7 +3898,7 @@ func _generate_world() -> void:
 					t = Terrain.COCONUT
 				elif rng.randf() < 0.03:
 					t = Terrain.BAMBOO
-				elif rng.randf() < 0.012:
+				elif rng.randf() < 0.006:
 					t = Terrain.HIVE
 				else:
 					t = Terrain.GRASS
@@ -3823,6 +3921,9 @@ func _generate_world() -> void:
 				_terrain[i] = Terrain.GRASS
 				_banana[i] = 0
 				_berry[i] = 0
+	# Lock in the starting wild-resource density; dawn re-seeding refills toward
+	# this number but never past it, so the isle can't silt up into a maze.
+	_natural_baseline = _natural_tile_count()
 	_compute_pool_shore()
 
 
@@ -4183,10 +4284,13 @@ func _update_status() -> void:
 	_bar_xp.value = _xp
 	_lbl_xp.text = "XP %d / %d" % [_xp, _xp_to_next]
 	var tool_name: String = TOOL_DEFS[_tool_equipped]["label"] if TOOL_DEFS.has(_tool_equipped) else "none"
+	var weapon_name := String(_weapon()["label"])
+	if bool(_weapon().get("ranged", false)):
+		weapon_name += "  (Ammo %d)" % _inv("sling_ammo")   # only ranged weapons show ammo
 	_lbl_stats.text = "Atk %d   Armor %d%%\nSpd %.2fx   Regen %.1f/s\nTool: %s   Weapon: %s" % [
 		int(round(_p_attack)), int(round(_p_armor * 100.0)),
 		_p_speed / PLAYER_SPEED, _p_regen,
-		tool_name, String(_weapon()["label"])
+		tool_name, weapon_name
 	]
 	_lbl_wood.text = "Wood:  %d" % _inv("wood")
 	_lbl_stone.text = "Stone: %d" % _inv("stone")
@@ -4498,7 +4602,7 @@ func _has_game_save() -> bool:
 func _serialize_state() -> Dictionary:
 	return {
 		"v": 1,
-		"seed": _seed,
+		"seed": _seed, "natural_baseline": _natural_baseline,
 		"terrain": _terrain, "banana": _banana, "berry": _berry, "growth": _growth,
 		"block_count": _block_count,
 		"cell": _cell, "facing": _facing, "player_pos": _player_pos,
@@ -4546,6 +4650,7 @@ func _load_game() -> bool:
 
 func _deserialize_state(d: Dictionary) -> void:
 	_seed = int(d.get("seed", _seed))
+	_natural_baseline = int(d.get("natural_baseline", 0))   # 0 -> lazily set on next dawn
 	if d.has("terrain"): _terrain = d["terrain"]
 	if d.has("banana"): _banana = d["banana"]
 	if d.has("berry"): _berry = d["berry"]
@@ -5878,6 +5983,7 @@ func _run_selftest() -> void:
 		_set_terrain(cc, Terrain.GRASS)
 	_resources = {"wood": 20, "stone": 20, "banana": 0, "berry": 0, "rotten_banana": 0, "rotten_berry": 0}
 	_cell = Vector2i(24, 25)
+	_player_pos = _cell_center_world(_cell)   # keep body position consistent with the cell
 
 	_build_struct = "floor"
 	_drag_action = BuildAction.BUILD
@@ -5920,6 +6026,7 @@ func _run_selftest() -> void:
 	_set_terrain(ns, Terrain.STONE)
 	_monsters.clear(); _night_snapshot.clear()
 	_cell = Vector2i(30, 30)
+	_player_pos = _cell_center_world(_cell)   # body away from the regrown tiles at dawn
 	_day = 1
 	_begin_night()
 	var ok_night: bool = _terrain_at(nt) == Terrain.GRASS and _terrain_at(ns) == Terrain.GRASS \
@@ -6062,7 +6169,7 @@ func _run_selftest() -> void:
 	# Surviving to dawn counts a night.
 	_init_progression()
 	_is_night = true
-	_time = 0.20
+	_time = 0.143            # just before dawn (night ends at f=0.145)
 	_advance_time(1.5)   # crosses into daylight
 	var ok_nights: bool = _nights_survived == 1 and not _is_night
 	_report("reaching dawn counts a survived night", ok_nights); fails += int(not ok_nights)
@@ -7236,6 +7343,84 @@ func _run_selftest() -> void:
 
 	_app_state = AppState.PLAYING; _set_overlay("none")
 	_turrets.clear(); _storage.clear(); _monsters = []
+
+	# --- Regression: playtest fixes (loot despawn, regrow cap, anti-wedge) ---
+	# Uncollected worm/bee loot crawls off instead of piling up forever.
+	_ground_items.clear()
+	_cell = Vector2i(40, 40); _player_pos = _cell_center_world(_cell)
+	_resources = _default_inventory()   # no glass jar
+	_spawn_loot("worm", 1, _cell_center_world(Vector2i(5, 5)))   # far away, can't be reached
+	_collect_ground_items(CRITTER_LOOT_LIFE + 1.0)
+	var ok_critter: bool = _ground_items.is_empty()
+	_report("uncollected worm/bee loot despawns", ok_critter); fails += int(not ok_critter)
+
+	# ...but a worm under your feet with a jar is still caught.
+	_ground_items.clear()
+	_resources["glass_jar"] = 1
+	_spawn_loot("worm", 1, _player_pos)
+	_collect_ground_items(0.1)
+	var ok_worm_jar: bool = _inv("worm") == 1 and _ground_items.is_empty()
+	_report("worm loot caught with a jar", ok_worm_jar); fails += int(not ok_worm_jar)
+
+	# Dawn re-seeding never grows past the world's baseline density.
+	var nat_before := _natural_tile_count()
+	_natural_baseline = nat_before
+	_cell = Vector2i(45, 45); _player_pos = _cell_center_world(_cell)
+	_regrow_world()
+	var ok_regrow_cap: bool = _natural_tile_count() == nat_before
+	_report("regrow respects baseline cap", ok_regrow_cap); fails += int(not ok_regrow_cap)
+
+	# Dawn won't regrow a solid tile on top of the player (anti-wedge).
+	var wedge_c := Vector2i(33, 33)
+	_cell = wedge_c; _player_pos = _cell_center_world(wedge_c)
+	_set_terrain(wedge_c, Terrain.GRASS)
+	_night_snapshot.clear()
+	_night_snapshot[_cell_index(wedge_c)] = {"t": Terrain.TREE, "banana": 0, "berry": 0}
+	_is_night = true
+	_begin_day()
+	var ok_nowedge: bool = _terrain_at(wedge_c) == Terrain.GRASS
+	_report("dawn won't regrow a tree onto the player", ok_nowedge); fails += int(not ok_nowedge)
+
+	# Can't place a solid block onto a cell your body overlaps.
+	_cell = Vector2i(36, 36)
+	_player_pos = _cell_center_world(_cell) + Vector2(CELL_SIZE * 0.45, 0)   # body straddles +x neighbour
+	var nbr := Vector2i(37, 36)
+	_set_terrain(nbr, Terrain.GRASS)
+	_resources = _default_inventory(); _resources["wood"] = 10
+	_build_struct = "wood_wall"; _drag_action = BuildAction.BUILD
+	_apply_build_at(nbr)
+	var ok_buildwedge: bool = _terrain_at(nbr) == Terrain.GRASS
+	_report("can't wall yourself into your own tile", ok_buildwedge); fails += int(not ok_buildwedge)
+
+	# Adhesive turret's slow field must not stay painted on the ground all day.
+	_turrets.clear()
+	var adh_idx := _cell_index(Vector2i(28, 28))
+	_turrets[adh_idx] = _new_turret(Vector2i(28, 28)); _configure_turret(adh_idx, "adhesive")
+	_turrets[adh_idx]["field"] = _cell_center_world(Vector2i(30, 30))   # laid during the night
+	_is_night = true; _night_snapshot.clear()
+	_begin_day()
+	var ok_field_clear: bool = (_turrets[adh_idx]["field"] as Vector2) == Vector2.INF
+	_report("adhesive field clears at dawn (no permanent ground field)", ok_field_clear); fails += int(not ok_field_clear)
+	_turrets.clear()
+
+	# Quick win #13: a ranged weapon shows its ammo count in the status panel.
+	_resources = _default_inventory()
+	_resources["slingshot"] = 1; _resources["sling_ammo"] = 7
+	_weapon_equipped = "slingshot"
+	_update_status()
+	var ok_ammo_hud: bool = _lbl_stats.text.contains("Ammo 7")
+	_report("ranged weapon shows ammo in status", ok_ammo_hud); fails += int(not ok_ammo_hud)
+	_weapon_equipped = ""
+
+	# Quick win #16: water-adjacency helper that drives the drink hint.
+	_set_terrain(Vector2i(40, 10), Terrain.WATER)
+	_cell = Vector2i(40, 11)
+	var ok_water_adj: bool = _adjacent_to_water()
+	_cell = Vector2i(44, 11)
+	var ok_water_far: bool = not _adjacent_to_water()
+	_report("water-adjacency drives the drink hint", ok_water_adj and ok_water_far); fails += int(not (ok_water_adj and ok_water_far))
+	_set_terrain(Vector2i(40, 10), Terrain.GRASS)
+
 	_nights_survived = 0; _init_progression(); _day = 1; _resources = _default_inventory()
 
 	print("SELFTEST DONE, failures=%d" % fails)
@@ -7275,7 +7460,7 @@ func _demo_setup() -> void:
 
 
 func _demo_night() -> void:
-	_time = 0.85
+	_time = 0.92
 	_apply_daylight()
 	_begin_night()
 	# A varied raid for the screenshot: one of several croc types around the base.
@@ -7331,7 +7516,7 @@ func _handle_shot_arg() -> void:
 		if "--night" in args:
 			_demo_night()
 		if "--roster" in args:
-			_time = 0.85; _apply_daylight(); _is_night = true
+			_time = 0.92; _apply_daylight(); _is_night = true
 			_monsters = []
 			var i := 0
 			for type in CROC_DEFS:
@@ -7350,7 +7535,7 @@ func _handle_shot_arg() -> void:
 			_refresh_context_panel()
 			_update_status()
 		if "--turretfight" in args:
-			_time = 0.85; _apply_daylight(); _is_night = true
+			_time = 0.92; _apply_daylight(); _is_night = true
 			_monsters = []; _turrets.clear()
 			var setups := [[Vector2i(2, -1), "sniper"], [Vector2i(2, 1), "mg"], [Vector2i(-2, -1), "boxer"], [Vector2i(-2, 1), "adhesive"], [Vector2i(0, -2), "trickster"]]
 			for su in setups:
