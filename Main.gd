@@ -4312,6 +4312,8 @@ func _header(text: String) -> Label:
 func _label(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.add_theme_font_size_override("font_size", 16)
 	l.add_theme_color_override("font_color", Color(0.92, 0.93, 0.96))
 	return l
@@ -5373,15 +5375,20 @@ func _build_build_panel() -> void:
 	for key in STRUCTURE_ORDER:
 		var s: Dictionary = STRUCTURES[key]
 		var locked: bool = s["bench"] and not has_bench
-		var txt := "[%d] %s  (%s)" % [s["num"], s["label"], _cost_text(s["cost"])]
-		if locked:
-			txt += "  *needs a workbench*"
 		var b := Button.new()
-		b.text = ("> " if key == _build_struct else "   ") + txt
+		b.text = "%s[%d] %s" % ["> " if key == _build_struct else "   ", s["num"], s["label"]]
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.add_theme_font_size_override("font_size", 15)
 		b.pressed.connect(_select_struct.bind(key))
 		_right_vbox.add_child(b)
+
+		var detail := _label("Cost: %s%s" % [
+			_cost_text(s["cost"]),
+			" - needs a workbench" if locked else ""
+		])
+		detail.add_theme_font_size_override("font_size", 13)
+		detail.add_theme_color_override("font_color", Color(0.70, 0.73, 0.80))
+		_right_vbox.add_child(detail)
 
 	_right_vbox.add_child(_sep())
 	_right_vbox.add_child(_label("B to exit build mode"))
