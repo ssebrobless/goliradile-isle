@@ -68,6 +68,21 @@ const FP_AUTO_MINER_STONE: int = 2
 const FP_AUTO_MINER_ORE_CHANCE: float = 0.35
 const FP_IRON_VEIN_COUNT: int = 5
 const FP_REGROW_STONE: int = 0
+const FP_GROUND_ITEM_TTL: float = 90.0
+const FP_WORM_DROP_CHANCE: float = 0.06
+const FP_HIVE_BEE_CHANCE: float = 0.15
+const FP_HIVE_HARVEST_BEE_CHANCE: float = 0.15
+const FP_WORLD_STONE_NOISE_THRESHOLD: float = 0.50
+const FP_WORLD_TREE_CHANCE: float = 0.06
+const FP_WORLD_BUSH_CHANCE: float = 0.02
+const FP_WORLD_COCONUT_CHANCE: float = 0.012
+const FP_WORLD_BAMBOO_CHANCE: float = 0.015
+const FP_WORLD_HIVE_CHANCE: float = 0.004
+const FP_REGROW_TREES: int = 3
+const FP_REGROW_BUSHES: int = 2
+const FP_REGROW_COCONUTS: int = 1
+const FP_REGROW_BAMBOO: int = 1
+const FP_REGROW_HIVES: int = 0
 const FP_TURRET_POWER_RATE_MULT: float = 0.75
 const FP_COUNTER_MATRIX := {
 	"physical": {"swarm": 1.25, "armored": 0.75, "single": 1.0, "support": 1.0},
@@ -244,8 +259,8 @@ const ITEM_DESC := {
 	"glue": "Boiled from spoiled fruit. Sticks wire.",
 	"wooden_rod": "A shaped haft for tools and traps.",
 	"nails": "Stone-cut fixings.",
-	"stone_tool": "Mines faster than bare hands.",
-	"metal_tool": "Mines fastest. Saves your stamina.",
+	"stone_tool": "Gathers +1 yield and uses 60% energy.",
+	"metal_tool": "Gathers +2 yield and uses 40% energy.",
 	"slingshot": "Throws stone from a safe distance.",
 	"mallet": "Slow, heavy, knocks crocs back hard.",
 	"spear": "Long reach. Strike before they close.",
@@ -303,7 +318,7 @@ const BEE_CAP: int = 4                     # bees one enclosure houses
 const BEE_PROD_TIME: float = 16.0          # seconds per honey/beeswax cycle (scales w/ bees)
 const BEE_PLANT_RADIUS: int = 4            # a plant must be within this many tiles to thrive
 const BEE_STARVE_TIME: float = 40.0        # with no plants near, a bee is lost after this
-const HIVE_BEE_CHANCE: float = 0.5         # chance a wild hive looses a bee each dawn
+const HIVE_BEE_CHANCE: float = FP_HIVE_BEE_CHANCE  # chance a wild hive looses a bee each dawn
 const FISH_MAX: int = 8                    # fish the pool holds at once
 const FISH_CATCH_R: float = CELL_SIZE * 1.6
 const FISH_ENERGY: float = 28.0            # raw fish ~ a banana of hunger, no hydration
@@ -369,9 +384,13 @@ const CRAFT_RECIPES := {
 # --- World pool + daily regrowth ---------------------------------------------
 const POOL_CENTER := Vector2(12.0, 13.0)  # the one constant water pool (never moves)
 const POOL_RADIUS: float = 4.2
-const REGROW_TREES: int = 6              # new resources sprinkled onto empty grass each dawn
+const GROUND_ITEM_TTL: float = FP_GROUND_ITEM_TTL
+const REGROW_TREES: int = FP_REGROW_TREES  # new resources sprinkled onto empty grass each dawn
 const REGROW_STONE: int = FP_REGROW_STONE
-const REGROW_BUSHES: int = 4
+const REGROW_BUSHES: int = FP_REGROW_BUSHES
+const REGROW_COCONUTS: int = FP_REGROW_COCONUTS
+const REGROW_BAMBOO: int = FP_REGROW_BAMBOO
+const REGROW_HIVES: int = FP_REGROW_HIVES
 
 # --- Combat / monster tuning -------------------------------------------------
 # These are the *base* (night-1 / level-1) stats; both sides scale from here.
@@ -845,7 +864,8 @@ const HP_RED: Color = Color(0.88, 0.28, 0.28)
 # the tutorial never replays across sessions; _reset_game clears it so New Game
 # re-teaches. Triggers live where the state already changes (one _onboard call each).
 const ONBOARD_BEATS := ["welcome", "first_thirst", "first_hunger", "day2_dusk",
-	"first_turret", "first_night", "tier_up", "first_den_seen", "casings"]
+	"first_turret", "first_night", "tier_up", "first_den_seen", "casings",
+	"tier_locked", "first_vein"]
 const ONBOARD_TINT: Color = Color(0.55, 0.85, 1.0)   # instructional blue (vs amber msg / red night)
 
 # Per-item-id -> category-tint family. The icon base + slot border read off this
@@ -1168,6 +1188,9 @@ func _ready() -> void:
 	_mark_workspace_dirty()
 	_refresh_workspace()
 
+	if "--pathing-probe" in OS.get_cmdline_user_args():
+		_run_pathing_probe()
+		return
 	if "--selftest" in OS.get_cmdline_user_args():
 		_run_selftest()
 		return
@@ -1269,6 +1292,8 @@ func _process(delta: float) -> void:
 	if hc != _hover_cell:
 		_hover_cell = hc
 		queue_redraw()
+	if not _is_night and _near_iron_vein():
+		_onboard("first_vein", "Iron veins mine themselves -- place an Auto-Miner on one. Power it (Tree aura) to double output.", 7.0)
 
 	_update_juice(delta)
 
@@ -1325,6 +1350,11 @@ func _board_hover_target() -> Array:
 	var key := _structure_key_for_terrain(_terrain_at(hc))
 	if key != "" and STRUCTURES.has(key):
 		return [key, "struct"]
+	var t := _terrain_at(hc)
+	if t == Terrain.MOTHER_TREE and _chebyshev(_cell, hc) <= 1:
+		return ["mother_tree_hub", "special"]
+	if t == Terrain.GRASS and _chebyshev(_cell, hc) <= 1:
+		return ["bare_grass", "special"]
 	return ["", ""]
 
 
@@ -1716,10 +1746,21 @@ func _flow_dir_from_cell(field: PackedFloat32Array, cell: Vector2i) -> Vector2:
 		return Vector2.ZERO
 	var best := here
 	var best_dir := Vector2.ZERO
-	for off in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+	var offsets := [
+		Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+		Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1),
+	]
+	for off in offsets:
 		var n: Vector2i = cell + off
 		if not _in_bounds(n):
 			continue
+		if off.x != 0 and off.y != 0:
+			var a := cell + Vector2i(off.x, 0)
+			var b := cell + Vector2i(0, off.y)
+			if not _in_bounds(a) or not _in_bounds(b) \
+					or not _tile_monster_walk(_terrain_at(a)) \
+					or not _tile_monster_walk(_terrain_at(b)):
+				continue
 		var nd := field[_cell_index(n)]
 		if nd < best:
 			best = nd
@@ -1753,9 +1794,9 @@ func _regrow_world() -> void:
 	for _i in range(REGROW_TREES): kinds.append(Terrain.TREE)
 	for _i in range(REGROW_STONE): kinds.append(Terrain.STONE)
 	for _i in range(REGROW_BUSHES): kinds.append(Terrain.BUSH)
-	for _i in range(2): kinds.append(Terrain.COCONUT)
-	for _i in range(2): kinds.append(Terrain.BAMBOO)
-	kinds.append(Terrain.HIVE)
+	for _i in range(REGROW_COCONUTS): kinds.append(Terrain.COCONUT)
+	for _i in range(REGROW_BAMBOO): kinds.append(Terrain.BAMBOO)
+	for _i in range(REGROW_HIVES): kinds.append(Terrain.HIVE)
 	for t in kinds:
 		var attempts := 0
 		while attempts < 60:
@@ -1972,6 +2013,17 @@ func _move_monster_toward(m: Dictionary, dir: Vector2, delta: float, speed: floa
 			play_sfx("wall_hit")
 			_damage_structure(c)
 			m["brk_cd"] = MONSTER_BRK_INTERVAL
+			return
+		var perp := Vector2(-dir.y, dir.x)
+		var best_pos: Vector2 = m["pos"]
+		var best_gain := best_pos.distance_to(before)
+		for retry_dir in [(dir + perp).normalized(), (dir - perp).normalized()]:
+			var retry_pos := _move_collide(before, retry_dir * speed * delta, MONSTER_RADIUS, true)
+			var gain := retry_pos.distance_to(before)
+			if gain > best_gain:
+				best_gain = gain
+				best_pos = retry_pos
+		m["pos"] = best_pos
 
 
 # White croc: heal living allies inside the aura and flag them for the FX.
@@ -2348,7 +2400,7 @@ func _configure_turret(idx: int, type: String) -> void:
 	if t["type"] != "":
 		return  # already chosen (permanent)
 	if not _turret_tier_ok(type):
-		_set_msg("Locked: %s needs Mother Tree tier %d." % [TURRET_DEFS[type]["label"], _turret_required_tier(type)])
+		_onboard("tier_locked", "Locked -- needs Mother Tree tier %d. Feed the Tree Sap at its hub to grow it and unlock this." % _turret_required_tier(type), 6.0)
 		return
 	var def: Dictionary = TURRET_DEFS[type]
 	t["type"] = type
@@ -3303,12 +3355,13 @@ func _apply_build_at(c: Vector2i) -> void:
 			return
 		var s: Dictionary = STRUCTURES[_build_struct]
 		if not _struct_tier_ok(_build_struct):
-			_set_msg("Locked: needs Mother Tree tier %d." % _struct_required_tier(_build_struct))
+			_onboard("tier_locked", "Locked -- needs Mother Tree tier %d. Feed the Tree Sap at its hub to grow it and unlock this." % _struct_required_tier(_build_struct), 6.0)
 			return
 		if c == _cell or _monster_at(c) != -1:
 			return
 		if _build_struct == "auto_miner":
 			if _terrain_at(c) != Terrain.IRON_VEIN:
+				_set_msg("Auto-Miner must be placed on an iron vein.")
 				return
 		elif _terrain_at(c) != Terrain.GRASS:
 			return
@@ -3522,6 +3575,15 @@ func _near_workbench() -> bool:
 				continue
 			var c := _cell + Vector2i(ox, oy)
 			if _in_bounds(c) and _terrain_at(c) == Terrain.WORKBENCH:
+				return true
+	return false
+
+
+func _near_iron_vein() -> bool:
+	for oy in range(-3, 4):
+		for ox in range(-3, 4):
+			var c := _cell + Vector2i(ox, oy)
+			if _in_bounds(c) and _terrain_at(c) == Terrain.IRON_VEIN:
 				return true
 	return false
 
@@ -3890,7 +3952,7 @@ func _empty_cup(kind: String) -> void:
 func _craft(key: String) -> void:
 	var r: Dictionary = CRAFT_RECIPES[key]
 	if not _craft_tier_ok(key):
-		_set_msg("Locked: needs Mother Tree tier %d." % _craft_required_tier(key))
+		_onboard("tier_locked", "Locked -- needs Mother Tree tier %d. Feed the Tree Sap at its hub to grow it and unlock this." % _craft_required_tier(key), 6.0)
 		return
 	var rot_cost := int(r.get("rot", 0))
 	var fish_cost := int(r.get("fish", 0))
@@ -4016,10 +4078,8 @@ func _harvest_cell(c: Vector2i) -> void:
 		_resources["stone"] = _inv("stone") + 2 + _tool_bonus()
 		if randf() < ORE_DROP_CHANCE:               # rocks sometimes hide metal ore
 			_resources["metal_ore"] = _inv("metal_ore") + 1
-		if randf() < 0.5:                            # ...and disturb a worm or two
-			var nworms := 1 + (1 if randf() < 0.4 else 0)
-			for _wi in range(nworms):
-				_spawn_loot("worm", 1, _cell_center_world(c))
+		if randf() < FP_WORM_DROP_CHANCE:            # rarely disturb one jar-catchable worm
+			_spawn_loot("worm", 1, _cell_center_world(c))
 	else:
 		return
 	_facing = _cardinal(Vector2(c - _cell))
@@ -4147,6 +4207,8 @@ func _collect_ground_items(delta: float) -> void:
 	var keep := []
 	for g in _ground_items:
 		g["t"] = float(g["t"]) + delta
+		if float(g["t"]) >= GROUND_ITEM_TTL:
+			continue
 		if (g["pos"] as Vector2).distance_to(_player_pos) <= LOOT_PICKUP_R + PLAYER_RADIUS:
 			var kind: String = g["kind"]
 			# Live critters (worm/bee) can only be scooped up if you have a glass jar.
@@ -4803,7 +4865,7 @@ func _bee_boost_plant(cell: Vector2i) -> void:
 # Click a wild hive: collect honey, occasionally shaking a bee loose.
 func _harvest_hive(c: Vector2i) -> void:
 	_resources["honey"] = _inv("honey") + 1 + (1 if randf() < 0.5 else 0)
-	if randf() < 0.4:
+	if randf() < FP_HIVE_HARVEST_BEE_CHANCE:
 		_spawn_loot("bee", 1, _cell_center_world(c))   # needs a jar to catch
 	_facing = _cardinal(Vector2(c - _cell))
 	_energy = maxf(0.0, _energy - ENERGY_HARVEST)
@@ -5530,17 +5592,17 @@ func _generate_world() -> void:
 				t = Terrain.SAND
 			else:
 				var n := noise.get_noise_2d(float(x), float(y))
-				if n > 0.45:
+				if n > FP_WORLD_STONE_NOISE_THRESHOLD:
 					t = Terrain.STONE
-				elif rng.randf() < 0.10:
+				elif rng.randf() < FP_WORLD_TREE_CHANCE:
 					t = Terrain.TREE
-				elif rng.randf() < 0.04:
+				elif rng.randf() < FP_WORLD_BUSH_CHANCE:
 					t = Terrain.BUSH
-				elif rng.randf() < 0.025:
+				elif rng.randf() < FP_WORLD_COCONUT_CHANCE:
 					t = Terrain.COCONUT
-				elif rng.randf() < 0.03:
+				elif rng.randf() < FP_WORLD_BAMBOO_CHANCE:
 					t = Terrain.BAMBOO
-				elif rng.randf() < 0.012:
+				elif rng.randf() < FP_WORLD_HIVE_CHANCE:
 					t = Terrain.HIVE
 				else:
 					t = Terrain.GRASS
@@ -5907,6 +5969,11 @@ func _tooltip_name(kind: String, source: String) -> String:
 			return String(WEAPON_DEFS.get(kind, {}).get("label", "Fists"))
 		"croc":
 			return "%s Croc" % kind.capitalize()
+		"special":
+			if kind == "mother_tree_hub":
+				return "Mother Tree Hub"
+			if kind == "bare_grass":
+				return "Bare Grass"
 	return kind.capitalize()
 
 
@@ -5936,6 +6003,8 @@ func _tooltip_subtitle(kind: String, source: String) -> String:
 			return String(CROC_DEFS.get(kind, {}).get("role", "")).capitalize()
 		"item", "recipe":
 			return INV_BAND_LABEL.get(INV_CATEGORY.get(kind, ""), "").capitalize()
+		"special":
+			return "Interact"
 	return ""
 
 
@@ -5964,6 +6033,11 @@ func _tooltip_desc(kind: String, source: String) -> String:
 			return String(WEAPON_DEFS.get(kind, {}).get("desc", ""))
 		"croc":
 			return String(CROC_DEFS.get(kind, {}).get("desc", ""))
+		"special":
+			if kind == "mother_tree_hub":
+				return "Open Tree hub. Deposit Sap there to grow it and unlock tech."
+			if kind == "bare_grass":
+				return "Click bare grass to pull fibers (for string)."
 	return ""
 
 
@@ -6312,6 +6386,8 @@ func _label(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_color_override("font_color", UI_TEXT)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = PANEL_W - 28.0
 	return l
 
 
@@ -7182,7 +7258,7 @@ func _enter_playing() -> void:
 	_set_overlay("none")
 	# Keystone teaching beat: fires once ever (persisted), so it lands on the first
 	# fresh run and never replays on a resumed game.
-	_onboard("welcome", "This is the Mother Tree. Keep it alive -- if it dies, the island is lost. Gather wood and stone by day.", 6.0)
+	_onboard("welcome", "This is the Mother Tree. Keep it alive -- if it dies, the island is lost. Gather wood, stone, and grass by day. Stand by the Mother Tree and click it to open its hub -- deposit Sap there to grow it and unlock tech.", 8.0)
 	_mark_workspace_dirty()
 	_update_status()
 	queue_redraw()
@@ -7622,7 +7698,7 @@ func _build_turret_panel(idx: int) -> void:
 			for ty in TURRET_TYPES[_turret_pick_cat]:
 				var b := Button.new()
 				var ty_locked: bool = not _turret_tier_ok(ty)
-				b.text = TURRET_DEFS[ty]["label"] + ("  (Tree T%d)" % _turret_required_tier(ty) if ty_locked else "")
+				b.text = TURRET_DEFS[ty]["label"] + ("  (grow Tree->T%d)" % _turret_required_tier(ty) if ty_locked else "")
 				b.tooltip_text = _stat_line(ty)
 				b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 				b.disabled = ty_locked
@@ -7737,6 +7813,9 @@ func _tooltip_stat_line(kind: String, source: String) -> String:
 				if float(dr[1]) > 0.0:
 					s += "  +%d heal" % int(dr[1])
 				return s
+			if TOOL_DEFS.has(kind):
+				var td: Dictionary = TOOL_DEFS[kind]
+				return "+%d gather  uses %d%% energy" % [int(td["bonus"]), int(round(float(td["energy"]) * 100.0))]
 			match kind:
 				"coconut": return "+%d hunger  +%d thirst" % [int(COCONUT_ENERGY), int(COCONUT_HYDRATION)]
 				"fish_m", "fish_f": return "+%d hunger" % int(FISH_ENERGY)
@@ -7784,9 +7863,15 @@ func _build_craft_panel() -> void:
 		var r: Dictionary = CRAFT_RECIPES[key]
 		var b := Button.new()
 		b.text = "%s  (%s)" % [r["label"], _cost_text(r["cost"])]
+		var tier_locked: bool = not _craft_tier_ok(key)
+		if tier_locked:
+			b.text += "  *grow Tree->T%d*" % _craft_required_tier(key)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.add_theme_font_size_override("font_size", 15)
-		b.disabled = not _can_afford(r["cost"])
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size.x = PANEL_W - 32.0
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		b.disabled = tier_locked or not _can_afford(r["cost"])
 		b.pressed.connect(_craft.bind(key))
 		_wire_hover(b, key, "recipe")
 		_right_vbox.add_child(b)
@@ -8076,13 +8161,16 @@ func _build_build_panel() -> void:
 		var tier_locked: bool = not _struct_tier_ok(key)
 		var txt := "[%d] %s  (%s)" % [s["num"], s["label"], _cost_text(s["cost"])]
 		if tier_locked:
-			txt += "  *Tree T%d*" % _struct_required_tier(key)
+			txt += "  *grow Tree->T%d*" % _struct_required_tier(key)
 		elif locked:
 			txt += "  *needs workbench*"
 		var b := Button.new()
 		b.text = ("> " if key == _build_struct else "   ") + txt
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.add_theme_font_size_override("font_size", 15)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size.x = PANEL_W - 32.0
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		b.disabled = tier_locked
 		b.pressed.connect(_select_struct.bind(key))
 		_wire_hover(b, key, "struct")
@@ -9911,6 +9999,69 @@ func _inventory_flow_evidence() -> Dictionary:
 	return {"produced": produced, "consumed": consumed}
 
 
+func _pathing_probe_result(seed_count: int = 20, crocs_per_seed: int = 20) -> Dictionary:
+	var total := 0
+	var reached := 0
+	var stuck := 0
+	var steps := 700
+	var dt := 0.05
+	var saved_seed := _seed
+	var saved_monsters := _monsters
+	var saved_cell := _cell
+	_monsters = []
+
+	for si in range(seed_count):
+		_seed = WORLD_SEED + si
+		seed(_seed)
+		_generate_world()
+		_ensure_flow_fields()
+		var rng := RandomNumberGenerator.new()
+		rng.seed = _seed + 99173
+		for _ci in range(crocs_per_seed):
+			var start := Vector2i(-1, -1)
+			var tries := 0
+			while tries < 900 and start.x < 0:
+				tries += 1
+				var c := Vector2i(rng.randi_range(0, GRID_CELLS - 1), rng.randi_range(0, GRID_CELLS - 1))
+				if _tile_monster_walk(_terrain_at(c)) and _chebyshev(c, _tree_center_cell()) >= 18:
+					start = c
+			if start.x < 0:
+				continue
+			total += 1
+			var start_pos := _cell_center_world(start)
+			var m := {
+				"pos": start_pos, "slow_t": 0.0, "brk_cd": 0.0,
+			}
+			var hit_tree := false
+			for _step in range(steps):
+				var pos: Vector2 = m["pos"]
+				if pos.distance_to(_cell_center_world(_nearest_tree_cell_to(pos))) <= CELL_SIZE * 1.6:
+					hit_tree = true
+					break
+				var fallback := _cell_center_world(_nearest_tree_cell_to(pos)) - pos
+				var dir := _flow_dir_from_pos(_field_tree, pos, fallback)
+				_move_monster_toward(m, dir, dt, CROC_SPEED)
+			if hit_tree:
+				reached += 1
+			elif (m["pos"] as Vector2).distance_to(start_pos) < CELL_SIZE * 0.5:
+				stuck += 1
+
+	_seed = saved_seed
+	_cell = saved_cell
+	_monsters = saved_monsters
+	_generate_world()
+	_ensure_flow_fields()
+	return {"seeds": seed_count, "crocs": total, "reached": reached, "stuck": stuck}
+
+
+func _run_pathing_probe() -> void:
+	var r := _pathing_probe_result(20, 20)
+	print("PATHING_PROBE seeds=%d crocs=%d reached_tree=%d stuck_whole_run=%d" % [
+		int(r["seeds"]), int(r["crocs"]), int(r["reached"]), int(r["stuck"]),
+	])
+	get_tree().quit(0)
+
+
 func _run_selftest() -> void:
 	var fails := 0
 
@@ -9944,31 +10095,49 @@ func _run_selftest() -> void:
 	_report("no monster-blocking tile lacks break_hp/impassable", ok_no_silent_block); fails += int(not ok_no_silent_block)
 
 	# INVARIANT: pather-walkability and collider-walkability must AGREE for every
-	# Terrain. The flow field (_flow_step_cost) treats a tile as freely walkable
-	# (step cost 1) iff _tile_monster_walk(t); the continuous collider (_box_blocked)
-	# must let a monster stand there iff that same predicate holds, and likewise for
-	# the player vs _tile_player_walk. No tile may be walkable to the pather yet
-	# blocked by the collider (or vice-versa) -- that drift is what stalled crocs on
-	# STUMP/SAPLING when the old WALKABLE/MONSTER_WALK tables disagreed with TILE_DEF.
+	# Terrain at the real monster/player radius. The old test used a zero-size body,
+	# which missed radius-vs-cell-corner stalls.
 	var ok_walk_agree := true
 	var pc := Vector2i(20, 20)
 	var pcen := _cell_center_world(pc)
-	var pc_orig := _terrain_at(pc)
+	var pc_orig := {}
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var rc := pc + Vector2i(dx, dy)
+			pc_orig[_cell_index(rc)] = _terrain_at(rc)
+			_set_terrain(rc, Terrain.GRASS)
 	for tid in Terrain.values():
 		_set_terrain(pc, tid)
 		# Pather: cost 1 means freely walkable (no break/impassable involved).
 		var pather_walk := _flow_step_cost(pc) == 1
-		# Collider: a zero-size box at the cell centre is blocked iff the tile is not walkable.
-		var coll_monster := not _box_blocked(pcen, 0.0, true)
-		var coll_player := not _box_blocked(pcen, 0.0, false)
+		# Collider: real-sized bodies at the cell centre must agree with TILE_DEF.
+		var coll_monster := not _box_blocked(pcen, MONSTER_RADIUS, true)
+		var coll_player := not _box_blocked(pcen, PLAYER_RADIUS, false)
 		if pather_walk != _tile_monster_walk(tid):
 			ok_walk_agree = false
 		if coll_monster != _tile_monster_walk(tid):
 			ok_walk_agree = false
 		if coll_player != _tile_player_walk(tid):
 			ok_walk_agree = false
-	_set_terrain(pc, pc_orig)
+	for idx in pc_orig:
+		_terrain[idx] = pc_orig[idx]
 	_report("pather and collider walkability agree", ok_walk_agree); fails += int(not ok_walk_agree)
+
+	var corner_patch := {}
+	for y in range(28, 33):
+		for x in range(28, 33):
+			var cc := Vector2i(x, y)
+			corner_patch[_cell_index(cc)] = _terrain_at(cc)
+			_set_terrain(cc, Terrain.GRASS)
+	_set_terrain(Vector2i(31, 30), Terrain.TREE)
+	var corner_start := _cell_center_world(Vector2i(30, 30))
+	var corner_croc := {"pos": corner_start, "slow_t": 0.0, "brk_cd": 0.0}
+	for _corner_i in range(12):
+		_move_monster_toward(corner_croc, Vector2.RIGHT, 0.08, CROC_SPEED)
+	var ok_corner_progress := (corner_croc["pos"] as Vector2).distance_to(corner_start) > CELL_SIZE * 0.25
+	for idx in corner_patch:
+		_terrain[idx] = corner_patch[idx]
+	_report("radius croc makes progress at obstacle corner", ok_corner_progress); fails += int(not ok_corner_progress)
 
 	var ok_icons := true
 	for item_id in INV_ORDER:
@@ -10054,10 +10223,18 @@ func _run_selftest() -> void:
 		and _tooltip_stat_line("stone_wall", "struct").contains("HP") \
 		and _tooltip_stat_line("green", "croc").contains("HP") \
 		and _tooltip_stat_line("banana", "item").contains("hunger") \
+		and _tooltip_stat_line("stone_tool", "item").contains("+1 gather") \
 		and _tooltip_stat_line("gunpowder", "item").contains("shot") \
 		and _tooltip_stat_line("wood", "item") == ""   # plain materials carry no stat row
 	_report("tooltip stat-line dispatches across all def families", ok_stat_dispatch)
 	fails += int(not ok_stat_dispatch)
+	var ok_remediation_beats: bool = "tier_locked" in ONBOARD_BEATS and "first_vein" in ONBOARD_BEATS \
+		and _tooltip_desc("bare_grass", "special").contains("Click bare grass") \
+		and _tooltip_desc("mother_tree_hub", "special").contains("Open Tree hub") \
+		and String(ITEM_DESC["stone_tool"]).contains("+1 yield") \
+		and String(ITEM_DESC["metal_tool"]).contains("+2 yield")
+	_report("remediation onboarding/tooltips are wired", ok_remediation_beats)
+	fails += int(not ok_remediation_beats)
 	# The turret counter hint must read the matrix (physical strong vs swarms).
 	var ok_counter_hint: bool = _turret_counter_hint("physical").contains("swarm") \
 		and _turret_counter_hint("ranged").contains("armored")
