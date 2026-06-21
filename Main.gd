@@ -100,7 +100,7 @@ const INV_ORDER := [
 	"sand", "metal", "charcoal", "glass", "glass_jar",
 	"worm", "bee", "honey", "beeswax", "fertilizer",
 	"croc_hide", "bone",
-	"fish_m", "fish_f", "fish_bones", "fish_skewer", "cooked_skewer", "ash",
+	"fish_m", "fish_f", "fish_bones", "fish_skewer", "cooked_skewer", "honey_skewer", "honey_cooked", "ash",
 	"rope", "glue", "wooden_rod", "nails",
 	"stone_tool", "metal_tool", "slingshot", "mallet", "spear", "sling_ammo",
 	"glapple_lamp", "rot",
@@ -114,7 +114,8 @@ const ITEM_LABELS := {
 	"worm": "Worm (jar)", "bee": "Bee (jar)", "honey": "Honey", "beeswax": "Beeswax", "fertilizer": "Fertilizer",
 	"croc_hide": "Croc Hide", "bone": "Bone",
 	"fish_m": "Fish (M)", "fish_f": "Fish (F)", "fish_bones": "Fish Bones",
-	"fish_skewer": "Raw Skewer", "cooked_skewer": "Cooked Skewer", "ash": "Ash",
+	"fish_skewer": "Raw Skewer", "cooked_skewer": "Cooked Skewer",
+	"honey_skewer": "Honey Skewer (raw)", "honey_cooked": "Honey-glazed Skewer", "ash": "Ash",
 	"rope": "Rope", "glue": "Glue", "wooden_rod": "Wooden Rod", "nails": "Nails",
 	"stone_tool": "Stone Tool", "metal_tool": "Metal Tool", "slingshot": "Slingshot",
 	"mallet": "Mallet", "spear": "Spear", "sling_ammo": "Sling Ammo",
@@ -124,6 +125,13 @@ const ITEM_LABELS := {
 	"cup": "Empty Cup", "cup_water": "Cup of Water", "cup_juice": "Cup of Juice", "cup_wine": "Cup of Wine",
 	"cup_oil": "Cup of Berry Oil",
 }
+# Inventory grouping for the Items tab (anything unlisted falls under Materials).
+const INV_CATEGORIES := ["Tools & Weapons", "Food & Drink", "Materials", "Critters"]
+const CAT_GEAR := {"stone_tool": 1, "metal_tool": 1, "slingshot": 1, "mallet": 1, "spear": 1, "sling_ammo": 1}
+const CAT_CRITTER := {"worm": 1, "bee": 1}
+const CAT_FOOD := {"coconut": 1, "glapple": 1, "banana": 1, "berry": 1, "rotten_banana": 1, "rotten_berry": 1,
+	"fish_m": 1, "fish_f": 1, "fish_skewer": 1, "cooked_skewer": 1, "honey": 1, "honey_skewer": 1, "honey_cooked": 1,
+	"cup": 1, "cup_water": 1, "cup_juice": 1, "cup_wine": 1}
 const EAT_ENERGY := {"banana": 30.0, "berry": 18.0}   # energy restored by eating each
 # Drink kind -> [hydration, health, energy]; the cup empties afterward.
 const DRINKS := {
@@ -146,6 +154,12 @@ const FISH_CATCH_R: float = CELL_SIZE * 1.6
 const FISH_ENERGY: float = 28.0            # raw fish ~ a banana of hunger, no hydration
 const COOK_TIME: float = 8.0               # skewer is done after this on a campfire
 const COOK_BURN_TIME: float = 16.0         # left this long, it chars to ash
+const HONEY_ENERGY: float = 16.0           # raw honey: a quick sugary snack (+ a little heal)
+const HONEY_HEAL: float = 6.0
+const HONEY_COOKED_ENERGY: float = FISH_ENERGY * 3.0 * 1.6   # heartiest meal (vs 1.4x plain skewer)
+const HONEY_COOKED_HEAL: float = 18.0
+const BEE_POLLIN_CAP: int = 4              # bonus-yield harvests a bee-pollinated planter banks
+const KILN_OUT_COUNT := {"nails": 6}       # cast jobs that yield a batch from one beeswax-mold pour
 const STILL_TICK: float = 6.0              # seconds to refine one cup of juice into oil
 # Phase 7: power. A generator burns berry oil to energize its wire network.
 const GEN_OIL_MAX: int = 5                 # cups of berry oil a generator holds
@@ -178,7 +192,7 @@ const GLUE_PER_ROT: int = 2              # rotten fruit consumed per glue
 # "glue" is special-cased in _craft (it eats any spoiled fruit, not a fixed item).
 const CRAFT_ORDER := ["string", "cup", "rope", "wooden_rod", "nails", "glue",
 	"sling_ammo", "metal_ammo", "stone_tool", "metal_tool", "slingshot", "mallet", "spear",
-	"glapple_lamp", "glass_jar", "fish_skewer", "bone_meal", "hide_armor"]
+	"glapple_lamp", "glass_jar", "fish_skewer", "honey_skewer", "bone_meal", "hide_armor"]
 const CRAFT_RECIPES := {
 	"string":     {"label": "String", "out": "string", "cost": {"grass": GRASS_PER_STRING}},
 	"cup":        {"label": "Empty Cup", "out": "cup", "cost": {"wood": WOOD_PER_CUP}},
@@ -196,6 +210,7 @@ const CRAFT_RECIPES := {
 	"metal_tool": {"label": "Metal Tool", "out": "metal_tool", "cost": {"metal": 2, "wooden_rod": 1, "rope": 1}},
 	"glass_jar":  {"label": "Glass Jar", "out": "glass_jar", "cost": {"glass": 1}},
 	"fish_skewer": {"label": "Raw Skewer (rod + 3 fish)", "out": "fish_skewer", "cost": {"wooden_rod": 1}, "fish": 3},
+	"honey_skewer": {"label": "Honey Skewer (skewer + honey)", "out": "honey_skewer", "cost": {"fish_skewer": 1, "honey": 1}},
 	"bone_meal":  {"label": "Bone Meal -> Fertilizer", "out": "fertilizer", "cost": {"bone": 2}},
 	"hide_armor": {"label": "Hide Armor (+armor)", "out": "", "cost": {"croc_hide": 3}, "armor": HIDE_ARMOR_STEP},
 }
@@ -237,6 +252,15 @@ const WEAPON_DEFS := {
 	"slingshot": {"label": "Slingshot", "dmg": 1.3, "reach": 1.0,  "time": 1.0, "kb": 0.6, "ranged": true},
 }
 const WEAPON_ITEMS := ["slingshot", "mallet", "spear"]
+# One-line "what it does" blurbs for the equip strip -- so tools vs weapons (and
+# what each accomplishes) is finally clear at a glance.
+const GEAR_DESC := {
+	"stone_tool": "faster wood & stone gathering",
+	"metal_tool": "much faster gathering (best tool)",
+	"slingshot": "ranged -- flings stones (needs ammo)",
+	"mallet": "heavy melee -- big hit + knockback, slow",
+	"spear": "long-reach melee -- strikes from further",
+}
 const SLING_PROJ_SPEED: float = CELL_SIZE * 13.0
 
 # --- Combat juice ------------------------------------------------------------
@@ -678,7 +702,7 @@ var _dragging: bool = false
 var _drag_action: int = BuildAction.NONE
 var _last_applied_cell: Vector2i = Vector2i(-9999, -9999)
 var _hover_cell: Vector2i = Vector2i(-1, -1)
-var _last_near_bench: bool = false
+var _last_has_bench: bool = false
 
 # Night / combat
 var _is_night: bool = false
@@ -686,6 +710,13 @@ var _monsters: Array = []          # [{pos, hp, type, role, ...}, ...]
 var _projectiles: Array = []       # [{pos, vel, kind, dmg}, ...] kind = "fire"|"snow"
 var _poison_clouds: Array = []     # [{pos, t}] purple lingering smoke
 var _night_snapshot := {}          # idx -> {t:int, apple:int}
+# Flow field: BFS distance-to-player over MONSTER_WALK tiles so crocs route AROUND
+# buildings instead of bulldozing straight through them. Rebuilt when the player
+# changes cell or the walls change; crocs fall back to straight-chase + chew when
+# no open path exists (i.e. the player has sealed themselves in).
+var _flow_dist: PackedInt32Array = PackedInt32Array()
+var _flow_src: Vector2i = Vector2i(-9999, -9999)
+var _flow_dirty: bool = true
 var _struct_hp := {}               # idx -> current break hp (only if damaged)
 var _turrets := {}                 # home cell idx -> turret object dict
 var _trap_cd := {}                 # idx -> seconds until a spike trap re-arms (0 = armed)
@@ -858,10 +889,10 @@ func _process(delta: float) -> void:
 		_close_turret()
 
 	if _build_mode:
-		var near := _near_workbench()
-		if near != _last_near_bench:
-			_last_near_bench = near
-			_refresh_context_panel()
+		var has_bench := _has_workbench()
+		if has_bench != _last_has_bench:
+			_last_has_bench = has_bench
+			_refresh_context_panel()   # unlock bench-gated items the moment one is built
 
 	var hc := _mouse_cell()
 	if hc != _hover_cell:
@@ -942,6 +973,7 @@ func _apply_daylight() -> void:
 
 func _begin_night() -> void:
 	_is_night = true
+	_flow_dirty = true   # new raid: rebuild paths against the latest base layout
 	# No building at night: force-exit build mode.
 	_build_mode = false
 	_build_struct = ""
@@ -1179,6 +1211,8 @@ func _regrow_world() -> void:
 
 
 func _monster_update(delta: float) -> void:
+	if _flow_dirty or _flow_src != _cell or _flow_dist.size() != GRID_CELLS * GRID_CELLS:
+		_build_flow_field()   # refresh paths when the player moves cell or walls change
 	_apply_heal_auras(delta)   # white crocs mend nearby allies (and flag them)
 
 	for m in _monsters:
@@ -1324,8 +1358,73 @@ func _award_kill_xp(m: Dictionary) -> void:
 			_turret_gain_xp(e, maxi(1, int(round(xp * TURRET_ENGINEER_XP_FRAC))))
 
 
-# Move a monster toward `dir`; if blocked by a structure, chew through it.
-func _move_monster_toward(m: Dictionary, dir: Vector2, delta: float, speed: float) -> void:
+const FLOW_NEI := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+	Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
+
+
+# Breadth-first flood from the player's cell over MONSTER_WALK tiles, storing the
+# step distance to the player in each cell (-1 = unreachable). Crocs then descend
+# this gradient to weave around walls; sealed-in players leave crocs unreachable.
+func _build_flow_field() -> void:
+	var n := GRID_CELLS * GRID_CELLS
+	if _flow_dist.size() != n:
+		_flow_dist.resize(n)
+	for i in range(n):
+		_flow_dist[i] = -1
+	var start := _cell
+	_flow_dist[_cell_index(start)] = 0
+	var queue: Array = [start]
+	var head := 0
+	while head < queue.size():
+		var c: Vector2i = queue[head]; head += 1
+		var d: int = _flow_dist[_cell_index(c)]
+		for off in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nb: Vector2i = c + off
+			if not _in_bounds(nb):
+				continue
+			var ni := _cell_index(nb)
+			if _flow_dist[ni] != -1 or not MONSTER_WALK.has(_terrain_at(nb)):
+				continue
+			_flow_dist[ni] = d + 1
+			queue.append(nb)
+	_flow_src = start
+	_flow_dirty = false
+
+
+# Direction down the flow gradient from `from`, or ZERO if no open route exists
+# (caller then falls back to straight-line chase, which lets it chew a wall).
+func _flow_dir(from: Vector2i) -> Vector2:
+	if _flow_dist.size() != GRID_CELLS * GRID_CELLS or not _in_bounds(from):
+		return Vector2.ZERO
+	var here: int = _flow_dist[_cell_index(from)]
+	var best: int = here if here >= 0 else 0x3FFFFFFF
+	var best_cell := from
+	for off in FLOW_NEI:
+		var nb: Vector2i = from + off
+		if not _in_bounds(nb):
+			continue
+		var nd: int = _flow_dist[_cell_index(nb)]
+		if nd < 0 or nd >= best:
+			continue
+		if off.x != 0 and off.y != 0:   # no diagonal corner-cutting through a wall
+			if not MONSTER_WALK.has(_terrain_at(Vector2i(from.x + off.x, from.y))):
+				continue
+			if not MONSTER_WALK.has(_terrain_at(Vector2i(from.x, from.y + off.y))):
+				continue
+		best = nd
+		best_cell = nb
+	if best_cell == from:
+		return Vector2.ZERO
+	return (Vector2(best_cell) - Vector2(from)).normalized()
+
+
+# Move a monster toward `dir`; follows the flow field when one exists (routing
+# around buildings), else straight -- and if blocked by a structure, chews through.
+func _move_monster_toward(m: Dictionary, dir: Vector2, delta: float, speed: float, use_flow: bool = true) -> void:
+	if use_flow:
+		var fdir := _flow_dir(_world_to_cell(m["pos"]))
+		if fdir != Vector2.ZERO:
+			dir = fdir
 	if m["slow_t"] > 0.0:
 		speed *= 0.5   # slowed by a spike trap / rocket
 	speed *= _adhesive_factor(m["pos"])   # adhesive support-turret slow field
@@ -1406,7 +1505,7 @@ func _update_wrecker(m: Dictionary, delta: float, dir_to_player: Vector2) -> voi
 			_damage_player(m["attack"], m["pos"])
 			m["atk_cd"] = MONSTER_ATK_INTERVAL
 		return
-	_move_monster_toward(m, dir, delta, m["speed"])
+	_move_monster_toward(m, dir, delta, m["speed"], false)   # wrecker steers to its own structure target
 
 
 func _nearest_structure_cell(from: Vector2) -> Vector2i:
@@ -1471,6 +1570,7 @@ func _damage_structure(c: Vector2i) -> void:
 		if _open_util == idx:
 			_close_util()
 		_set_terrain(c, Terrain.GRASS)
+		_flow_dirty = true   # a wall fell -> crocs may have a new way through
 	else:
 		_struct_hp[idx] = hp
 	queue_redraw()
@@ -2423,41 +2523,16 @@ func _input(event: InputEvent) -> void:
 				_choose_stat(STAT_ORDER[kc - KEY_1])
 			return
 		if kc == KEY_B:
-			# Build mode is daytime-only. B toggles it; pressing B again exits.
-			if _build_mode:
-				_build_mode = false
-				_build_struct = ""
-				_dragging = false
-				_drag_action = BuildAction.NONE
-				_refresh_context_panel()
-				queue_redraw()
-			elif not _is_night:
-				_build_mode = true
-				_close_storage()
-				_refresh_context_panel()
-				queue_redraw()
+			# B toggles the Build tab (build mode is daytime-only).
+			_select_tab("help" if _build_mode else "build")
 		elif kc == KEY_E:
 			_try_eat()
 		elif kc == KEY_Q:
 			_drink_best()
 		elif kc == KEY_I:
-			# Toggle the inventory-management panel (drop items).
-			_inv_open = not _inv_open
-			if _inv_open:
-				_build_mode = false
-				_craft_open = false
-				_close_storage()
-			_refresh_context_panel()
-			queue_redraw()
+			_select_tab("help" if _inv_open else "items")
 		elif kc == KEY_C:
-			# Toggle the crafting panel.
-			_craft_open = not _craft_open
-			if _craft_open:
-				_build_mode = false
-				_inv_open = false
-				_close_storage()
-			_refresh_context_panel()
-			queue_redraw()
+			_select_tab("help" if _craft_open else "craft")
 		elif _build_mode and kc >= KEY_1 and kc <= KEY_9:
 			_select_by_num(kc - KEY_0)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -2525,7 +2600,8 @@ func _apply_build_at(c: Vector2i) -> void:
 		if not WALKABLE.has(int(s["terrain"])) and _cell_overlaps_player(c):
 			_set_msg("Too close -- step back to place that.")
 			return
-		if s["bench"] and not _near_workbench():
+		if s["bench"] and not _has_workbench():
+			_set_msg("Build a workbench first to unlock this.")
 			return
 		# Structural blocks (walls/floors/doors) are capped; workstations/turrets exempt.
 		if BLOCK_TERRAIN.has(int(s["terrain"])) and _block_count >= BLOCK_LIMIT:
@@ -2665,14 +2741,13 @@ func _structure_key_for_terrain(t: int) -> String:
 	return ""
 
 
-func _near_workbench() -> bool:
-	for oy in range(-1, 2):
-		for ox in range(-1, 2):
-			if ox == 0 and oy == 0:
-				continue
-			var c := _cell + Vector2i(ox, oy)
-			if _in_bounds(c) and _terrain_at(c) == Terrain.WORKBENCH:
-				return true
+# Tech gate: bench-locked items (turrets, machines, etc.) unlock once a workbench
+# exists ANYWHERE in the base -- you no longer have to stand next to one to place
+# them, so a turret can go where it's useful instead of beside the bench.
+func _has_workbench() -> bool:
+	for t in _terrain:
+		if t == Terrain.WORKBENCH:
+			return true
 	return false
 
 
@@ -3076,6 +3151,19 @@ func _try_eat() -> void:
 		_hydration = minf(HYDRATION_MAX, _hydration + COCONUT_HYDRATION)
 		_give_item("coconut_shell", 1)
 		return
+	# A honey-glazed skewer is the heartiest meal -- feeds a lot AND heals.
+	if _inv("honey_cooked") > 0 and (_energy < ENERGY_MAX or _health < _p_max_health):
+		_resources["honey_cooked"] = _inv("honey_cooked") - 1
+		_energy = minf(ENERGY_MAX, _energy + HONEY_COOKED_ENERGY)
+		_health = minf(_p_max_health, _health + HONEY_COOKED_HEAL)
+		_give_item("fish_bones", 3)
+		return
+	# Raw honey: a quick sugary pick-me-up (energy + a little health).
+	if _inv("honey") > 0 and (_energy < ENERGY_MAX or _health < _p_max_health):
+		_resources["honey"] = _inv("honey") - 1
+		_energy = minf(ENERGY_MAX, _energy + HONEY_ENERGY)
+		_health = minf(_p_max_health, _health + HONEY_HEAL)
+		return
 	if _energy >= ENERGY_MAX:
 		return
 	# A cooked skewer is the heartiest meal (3 fish worth) and leaves bones.
@@ -3399,7 +3487,7 @@ func _utility_tick(delta: float) -> void:
 				kl["conv"] = 0.0
 				kl["fuel"] = float(kl["fuel"]) - KILN_FUEL_PER_JOB
 				var out_kind: String = q.pop_front()
-				_give_item(out_kind, 1)
+				_give_item(out_kind, int(KILN_OUT_COUNT.get(out_kind, 1)))
 	# Bee enclosures: bees make honey/beeswax + speed a nearby plant, but need a
 	# plant nearby to survive (or they slowly die off).
 	for idx in _apiaries:
@@ -3446,7 +3534,7 @@ func _utility_tick(delta: float) -> void:
 	# Campfires: a loaded skewer cooks, then chars to ash if left too long.
 	for idx in _campfires:
 		var cf: Dictionary = _campfires[idx]
-		if cf["item"] == "fish_skewer":
+		if cf["item"] == "fish_skewer" or cf["item"] == "honey_skewer":
 			cf["cook"] = float(cf["cook"]) + delta
 			if cf["cook"] >= COOK_BURN_TIME:
 				cf["item"] = "ash"
@@ -3569,6 +3657,16 @@ func _kiln_load(idx: int, input_item: String, output_item: String) -> void:
 	_refresh_context_panel()
 
 
+# Casting (beeswax molds): spend a multi-item cost up front, queue the cast part.
+# The mold (beeswax) is consumed; the kiln pours metal into it as a normal job.
+func _kiln_cast(idx: int, cost: Dictionary, output_item: String) -> void:
+	if not _can_afford(cost):
+		_set_msg("Need %s to cast." % _cost_text(cost)); return
+	_spend(cost)
+	(_kilns[idx]["queue"] as Array).append(output_item)
+	_refresh_context_panel()
+
+
 # --- Bees / hives ------------------------------------------------------------
 # True if any growing plant sits within `r` tiles (bees need greenery to thrive).
 func _plant_near(cell: Vector2i, r: int) -> bool:
@@ -3584,13 +3682,14 @@ func _plant_near(cell: Vector2i, r: int) -> bool:
 	return false
 
 
-# Nudge the nearest planted planter's growth along (bee pollination perk).
+# Bee pollination: speed growth AND bank a bonus-yield harvest on every planted
+# planter in range -- so an apiary beside your beds is a real agriculture engine.
 func _bee_boost_plant(cell: Vector2i) -> void:
 	for idx in _planters:
 		var p: Dictionary = _planters[idx]
 		if p["planted"] and _chebyshev(cell, _index_cell(idx)) <= BEE_PLANT_RADIUS:
 			p["grow"] = float(p["grow"]) + PLANTER_GROW * 0.4
-			return
+			p["pollin"] = mini(BEE_POLLIN_CAP, int(p.get("pollin", 0)) + 1)
 
 
 # Click a wild hive: collect honey, occasionally shaking a bee loose.
@@ -3650,14 +3749,14 @@ func _wormfarm_add_rot(idx: int) -> void:
 
 
 # --- Campfire cooking --------------------------------------------------------
-func _campfire_put(idx: int) -> void:
+func _campfire_put(idx: int, item: String) -> void:
 	var cf: Dictionary = _campfires[idx]
 	if cf["item"] != "":
 		_set_msg("Something's already on the fire."); return
-	if _inv("fish_skewer") <= 0:
-		_set_msg("Make a raw skewer first (rod + 3 fish)."); return
-	_resources["fish_skewer"] = _inv("fish_skewer") - 1
-	cf["item"] = "fish_skewer"; cf["cook"] = 0.0
+	if _inv(item) <= 0:
+		_set_msg("No %s to cook." % ITEM_LABELS.get(item, item)); return
+	_resources[item] = _inv(item) - 1
+	cf["item"] = item; cf["cook"] = 0.0
 	_refresh_context_panel()
 
 
@@ -3668,9 +3767,10 @@ func _campfire_take(idx: int) -> void:
 	if cf["item"] == "ash":
 		_give_item("ash", 1)
 	elif float(cf["cook"]) >= COOK_TIME:
-		_give_item("cooked_skewer", 1)   # perfectly done
+		# Perfectly done -- a honey skewer glazes into the heartiest meal.
+		_give_item("honey_cooked" if cf["item"] == "honey_skewer" else "cooked_skewer", 1)
 	else:
-		_give_item("fish_skewer", 1)     # pulled off too soon, still raw
+		_give_item(String(cf["item"]), 1)   # pulled off too soon, still raw
 	cf["item"] = ""; cf["cook"] = 0.0
 	_refresh_context_panel()
 
@@ -3815,6 +3915,9 @@ func _planter_harvest(idx: int) -> void:
 	if int(p.get("fert", 0)) > 0:        # fertilized soil yields an extra berry
 		yield_n += 1
 		p["fert"] = int(p["fert"]) - 1
+	if int(p.get("pollin", 0)) > 0:      # bee-pollinated bushes set an extra berry too
+		yield_n += 1
+		p["pollin"] = int(p["pollin"]) - 1
 	_resources["berry"] = _inv("berry") + yield_n
 	if randf() < 0.5:
 		_resources["seed"] = _inv("seed") + 1   # planted bushes sometimes reseed
@@ -3964,11 +4067,14 @@ func _is_outdoors(start: Vector2i) -> bool:
 
 func _set_terrain(c: Vector2i, t: int) -> void:
 	var i := _cell_index(c)
+	var old_t: int = _terrain[i]
 	# Keep the structural-block tally in sync as tiles change (single choke point).
 	if BLOCK_TERRAIN.has(_terrain[i]):
 		_block_count -= 1
 	if BLOCK_TERRAIN.has(t):
 		_block_count += 1
+	if MONSTER_WALK.has(old_t) != MONSTER_WALK.has(t) or BREAK_HP.has(old_t) != BREAK_HP.has(t):
+		_flow_dirty = true
 	_terrain[i] = t
 	_growth[i] = 0.0
 	if t != Terrain.TREE:
@@ -4311,20 +4417,76 @@ func _refresh_context_panel() -> void:
 
 	if _choosing_levelup:
 		_build_levelup_panel()
-	elif _craft_open:
-		_build_craft_panel()
-	elif _inv_open:
-		_build_inventory_panel()
-	elif _open_turret >= 0:
+		return
+	_build_tab_bar()
+	if _open_turret >= 0:
 		_build_turret_panel(_open_turret)
 	elif _open_util >= 0:
 		_build_util_panel(_open_util)
 	elif _open_storage >= 0:
 		_build_storage_panel(_open_storage)
+	elif _craft_open:
+		_build_craft_panel()
+	elif _inv_open:
+		_build_inventory_panel()
 	elif _build_mode:
 		_build_build_panel()
 	else:
 		_build_help_panel()
+
+
+# A clickable tab strip atop the right panel so Build / Craft / Items / Help are
+# one click apart (and discoverable) instead of hidden behind B/C/I keys. Panels
+# are still one-at-a-time, but switching is instant and never loses your build
+# selection -- so you can pick a wall, pop to Craft to check materials, and pop
+# back with the wall still armed.
+const PANEL_TABS := [["Help", "help"], ["Build", "build"], ["Craft", "craft"], ["Items", "items"]]
+
+
+func _current_tab() -> String:
+	if _open_turret >= 0 or _open_util >= 0 or _open_storage >= 0:
+		return ""   # a machine/storage/turret panel is showing -- no tab is "active"
+	if _build_mode: return "build"
+	if _craft_open: return "craft"
+	if _inv_open: return "items"
+	return "help"
+
+
+func _build_tab_bar() -> void:
+	var active := _current_tab()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for spec in PANEL_TABS:
+		var b := Button.new()
+		var is_active: bool = spec[1] == active
+		b.text = ("[ %s ]" % spec[0]) if is_active else spec[0]
+		b.add_theme_font_size_override("font_size", 14)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if is_active:
+			b.add_theme_color_override("font_color", UI_ACCENT)
+		b.pressed.connect(_select_tab.bind(spec[1]))
+		row.add_child(b)
+	_right_vbox.add_child(row)
+	_right_vbox.add_child(_sep())
+
+
+func _select_tab(tab: String) -> void:
+	# Switching tabs closes any open machine/storage/turret and the other tabs,
+	# but PRESERVES _build_struct so a re-opened Build tab is still armed.
+	_open_util = -1; _open_storage = -1; _open_turret = -1; _turret_pick_cat = ""
+	_build_mode = false; _craft_open = false; _inv_open = false
+	_dragging = false; _drag_action = BuildAction.NONE
+	match tab:
+		"build":
+			if not _is_night:
+				_build_mode = true
+		"craft":
+			_craft_open = true
+		"items":
+			_inv_open = true
+	_refresh_context_panel()
+	queue_redraw()
 
 
 # --- Options / window resolution ---------------------------------------------
@@ -4802,6 +4964,14 @@ func _build_kiln_panel(idx: int) -> void:
 	var ch := Button.new(); ch.text = "Char Wood -> Charcoal"; ch.pressed.connect(_kiln_load.bind(idx, "wood", "charcoal"))
 	_right_vbox.add_child(ch)
 	_right_vbox.add_child(_sep())
+	_right_vbox.add_child(_label("Cast with a beeswax mold:"))
+	var cn := Button.new(); cn.text = "Cast Nails x6 (beeswax + metal)"
+	cn.pressed.connect(_kiln_cast.bind(idx, {"beeswax": 1, "metal": 1}, "nails"))
+	_right_vbox.add_child(cn)
+	var ct := Button.new(); ct.text = "Cast Metal Tool (beeswax + 2 metal)"
+	ct.pressed.connect(_kiln_cast.bind(idx, {"beeswax": 1, "metal": 2}, "metal_tool"))
+	_right_vbox.add_child(ct)
+	_right_vbox.add_child(_sep())
 	_right_vbox.add_child(_label("Outputs land in your pack."))
 	_right_vbox.add_child(_label("[walk away to close]"))
 
@@ -4916,12 +5086,15 @@ func _build_campfire_panel(idx: int) -> void:
 	var state := "empty"
 	if cf["item"] == "ash":
 		state = "BURNT (ash)"
-	elif cf["item"] == "fish_skewer":
-		state = "cooked!" if float(cf["cook"]) >= COOK_TIME else "cooking... (%ds)" % int(COOK_TIME - float(cf["cook"]))
+	elif cf["item"] == "fish_skewer" or cf["item"] == "honey_skewer":
+		var what: String = "honey skewer" if cf["item"] == "honey_skewer" else "skewer"
+		state = "%s cooked!" % what if float(cf["cook"]) >= COOK_TIME else "%s cooking... (%ds)" % [what, int(COOK_TIME - float(cf["cook"]))]
 	_right_vbox.add_child(_label("On the fire: %s" % state))
 	_right_vbox.add_child(_sep())
-	var pb := Button.new(); pb.text = "Put Skewer On"; pb.pressed.connect(_campfire_put.bind(idx))
+	var pb := Button.new(); pb.text = "Cook Skewer"; pb.pressed.connect(_campfire_put.bind(idx, "fish_skewer"))
 	_right_vbox.add_child(pb)
+	var hb := Button.new(); hb.text = "Cook Honey Skewer"; hb.pressed.connect(_campfire_put.bind(idx, "honey_skewer"))
+	_right_vbox.add_child(hb)
 	var tb := Button.new(); tb.text = "Take Off"; tb.pressed.connect(_campfire_take.bind(idx))
 	_right_vbox.add_child(tb)
 	_right_vbox.add_child(_label("Leave it too long and it chars to ash."))
@@ -4943,6 +5116,8 @@ func _build_planter_panel(idx: int) -> void:
 		_right_vbox.add_child(_sep())
 		if int(p.get("fert", 0)) > 0:
 			_right_vbox.add_child(_label("Fertilized: %d harvests" % int(p["fert"])))
+		if int(p.get("pollin", 0)) > 0:
+			_right_vbox.add_child(_label("Bee-pollinated: %d harvests" % int(p["pollin"])))
 		_right_vbox.add_child(_sep())
 		var wt := Button.new(); wt.text = "Water"; wt.pressed.connect(_planter_water.bind(idx))
 		_right_vbox.add_child(wt)
@@ -5040,44 +5215,75 @@ func _build_craft_panel() -> void:
 	_right_vbox.add_child(_label("[C] close"))
 
 
+func _item_category(kind: String) -> String:
+	if CAT_GEAR.has(kind): return "Tools & Weapons"
+	if CAT_CRITTER.has(kind): return "Critters"
+	if CAT_FOOD.has(kind): return "Food & Drink"
+	return "Materials"
+
+
+# A category sub-header inside the Items tab.
+func _cat_header(text: String) -> Label:
+	var l := Label.new()
+	l.text = text.to_upper()
+	l.add_theme_font_size_override("font_size", 15)
+	l.add_theme_color_override("font_color", UI_STONE)
+	return l
+
+
+# The equipped-gear strip: what's in hand + a one-line reminder of what it does.
+func _gear_line(slot: String, kind: String) -> Label:
+	var l := Label.new()
+	l.add_theme_color_override("font_color", UI_ACCENT)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # wrap, don't widen the panel
+	l.size_flags_horizontal = Control.SIZE_FILL
+	if kind == "":
+		l.text = "%s: %s" % [slot, "Fists -- bare hands" if slot == "Weapon" else "none"]
+	else:
+		l.text = "%s: %s -- %s" % [slot, ITEM_LABELS.get(kind, kind), GEAR_DESC.get(kind, "")]
+	return l
+
+
+func _add_inventory_row(kind: String) -> void:
+	var eqmark := ""
+	if kind == _tool_equipped or (kind == _weapon_equipped and kind != ""):
+		eqmark = "  [equipped]"
+	_right_vbox.add_child(_label("%s  x%d%s" % [ITEM_LABELS.get(kind, kind), _inv(kind), eqmark]))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	if kind in TOOL_ITEMS or kind in WEAPON_ITEMS:
+		var eq := Button.new()
+		eq.text = "Unequip" if (kind == _tool_equipped or kind == _weapon_equipped) else "Equip"
+		eq.pressed.connect(_equip.bind(kind))
+		row.add_child(eq)
+	if DRINKS.has(kind):
+		var dr := Button.new(); dr.text = "Drink"; dr.pressed.connect(_drink.bind(kind))
+		var em := Button.new(); em.text = "Empty"; em.pressed.connect(_empty_cup.bind(kind))
+		row.add_child(dr); row.add_child(em)
+	var d1 := Button.new(); d1.text = "Drop 1"; d1.pressed.connect(_delete_item.bind(kind, false))
+	var dall := Button.new(); dall.text = "Drop all"; dall.pressed.connect(_delete_item.bind(kind, true))
+	row.add_child(d1); row.add_child(dall)
+	_right_vbox.add_child(row)
+
+
 func _build_inventory_panel() -> void:
-	_right_vbox.add_child(_header("INVENTORY"))
-	_right_vbox.add_child(_label("Drop items you don't want."))
+	_right_vbox.add_child(_header("ITEMS"))
+	# Equip strip: what's in hand + what it does (solves the tool-vs-weapon confusion).
+	_right_vbox.add_child(_gear_line("Tool", _tool_equipped))
+	_right_vbox.add_child(_gear_line("Weapon", _weapon_equipped))
 	_right_vbox.add_child(_sep())
+	# Items grouped by category; only non-empty groups print a header.
 	var any := false
-	for kind in INV_ORDER:
-		if _inv(kind) <= 0:
-			continue
-		any = true
-		var eqmark := ""
-		if kind == _tool_equipped or (kind == _weapon_equipped and kind != ""):
-			eqmark = "  [equipped]"
-		_right_vbox.add_child(_label("%s  x%d%s" % [ITEM_LABELS.get(kind, kind), _inv(kind), eqmark]))
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		if kind in TOOL_ITEMS or kind in WEAPON_ITEMS:
-			var eq := Button.new()
-			eq.text = "Unequip" if (kind == _tool_equipped or kind == _weapon_equipped) else "Equip"
-			eq.pressed.connect(_equip.bind(kind))
-			row.add_child(eq)
-		if DRINKS.has(kind):
-			var dr := Button.new()
-			dr.text = "Drink"
-			dr.pressed.connect(_drink.bind(kind))
-			var em := Button.new()
-			em.text = "Empty"
-			em.pressed.connect(_empty_cup.bind(kind))
-			row.add_child(dr)
-			row.add_child(em)
-		var d1 := Button.new()
-		d1.text = "Drop 1"
-		d1.pressed.connect(_delete_item.bind(kind, false))
-		var dall := Button.new()
-		dall.text = "Drop all"
-		dall.pressed.connect(_delete_item.bind(kind, true))
-		row.add_child(d1)
-		row.add_child(dall)
-		_right_vbox.add_child(row)
+	for cat in INV_CATEGORIES:
+		var first := true
+		for kind in INV_ORDER:
+			if _inv(kind) <= 0 or _item_category(kind) != cat:
+				continue
+			if first:
+				_right_vbox.add_child(_cat_header(cat))
+				first = false
+			any = true
+			_add_inventory_row(kind)
 	if not any:
 		_right_vbox.add_child(_label("(empty)"))
 	_right_vbox.add_child(_sep())
@@ -5163,13 +5369,13 @@ func _build_build_panel() -> void:
 	_right_vbox.add_child(_label("Blocks: %d / %d" % [_block_count, BLOCK_LIMIT]))
 	_right_vbox.add_child(_sep())
 
-	var near := _near_workbench()
+	var has_bench := _has_workbench()
 	for key in STRUCTURE_ORDER:
 		var s: Dictionary = STRUCTURES[key]
-		var locked: bool = s["bench"] and not near
+		var locked: bool = s["bench"] and not has_bench
 		var txt := "[%d] %s  (%s)" % [s["num"], s["label"], _cost_text(s["cost"])]
 		if locked:
-			txt += "  *needs workbench*"
+			txt += "  *needs a workbench*"
 		var b := Button.new()
 		b.text = ("> " if key == _build_struct else "   ") + txt
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -6055,21 +6261,38 @@ func _run_selftest() -> void:
 	_is_night = true
 	# Chase: a monster on open ground closes distance to the player.
 	_set_terrain(Vector2i(21, 20), Terrain.GRASS)
-	_player_pos = _cell_center_world(Vector2i(20, 20))
+	_cell = Vector2i(20, 20); _player_pos = _cell_center_world(_cell)
 	_monsters = [_mk_croc(_cell_center_world(Vector2i(25, 20)), MONSTER_HP)]
 	var d0 := _player_pos.distance_to(_monsters[0]["pos"])
 	_monster_update(0.1)
 	var ok_chase: bool = _player_pos.distance_to(_monsters[0]["pos"]) < d0
 	_report("monster chases the player", ok_chase); fails += int(not ok_chase)
 
-	# Blocked by a wall -> chews through it.
-	_set_terrain(Vector2i(21, 20), Terrain.WOOD_WALL)
+	# Sealed off by walls -> no flow route exists, so the croc chews through.
+	for wc0 in [Vector2i(19, 20), Vector2i(20, 19), Vector2i(20, 21), Vector2i(21, 19), Vector2i(21, 20), Vector2i(21, 21)]:
+		_set_terrain(wc0, Terrain.WOOD_WALL)
 	_struct_hp.clear()
 	_monsters = [_mk_croc(_cell_center_world(Vector2i(22, 20)), MONSTER_HP)]
 	_monster_update(0.1)
 	var widx := _cell_index(Vector2i(21, 20))
 	var ok_break: bool = _struct_hp.get(widx, 99) == BREAK_HP[Terrain.WOOD_WALL] - 1
 	_report("monster breaks a blocking wall", ok_break); fails += int(not ok_break)
+
+	# Open paths should route crocs around a single wall instead of chewing it.
+	for wc1 in [Vector2i(19, 20), Vector2i(20, 19), Vector2i(20, 21), Vector2i(21, 19), Vector2i(21, 20), Vector2i(21, 21)]:
+		_set_terrain(wc1, Terrain.GRASS)
+	_set_terrain(Vector2i(21, 20), Terrain.WOOD_WALL)
+	for ry in [19, 21]:
+		for rx in range(20, 24):
+			_set_terrain(Vector2i(rx, ry), Terrain.GRASS)
+	_struct_hp.clear()
+	_cell = Vector2i(20, 20); _player_pos = _cell_center_world(_cell)
+	_monsters = [_mk_croc(_cell_center_world(Vector2i(22, 20)), MONSTER_HP)]
+	var route_start: Vector2 = _monsters[0]["pos"]
+	_monster_update(0.1)
+	var route_pos: Vector2 = _monsters[0]["pos"]
+	var ok_route: bool = _struct_hp.is_empty() and absf(route_pos.y - route_start.y) > 1.0
+	_report("monster routes around open wall gaps", ok_route); fails += int(not ok_route)
 
 	# Adjacent monster damages the player and knocks them back.
 	_set_terrain(Vector2i(21, 20), Terrain.GRASS)
@@ -7035,14 +7258,14 @@ func _run_selftest() -> void:
 	_campfires.clear()
 	var cfi := _cell_index(Vector2i(26, 18)); _set_terrain(Vector2i(26, 18), Terrain.CAMPFIRE)
 	_campfires[cfi] = {"item": "", "cook": 0.0}
-	_campfire_put(cfi)
+	_campfire_put(cfi, "fish_skewer")
 	_utility_tick(COOK_TIME + 0.1)
 	_campfire_take(cfi)
 	var ok_cooked: bool = _inv("cooked_skewer") == 1 and _campfires[cfi]["item"] == ""
 	_report("skewer cooks on a campfire", ok_skewer and ok_cooked); fails += int(not (ok_skewer and ok_cooked))
 	# Left too long, the skewer chars to ash.
 	_resources = _default_inventory(); _resources["wooden_rod"] = 1; _resources["fish_f"] = 3
-	_craft("fish_skewer"); _campfire_put(cfi)
+	_craft("fish_skewer"); _campfire_put(cfi, "fish_skewer")
 	_utility_tick(COOK_BURN_TIME + 0.1)
 	_campfire_take(cfi)
 	var ok_ash: bool = _inv("ash") == 1
@@ -7421,6 +7644,95 @@ func _run_selftest() -> void:
 	_report("water-adjacency drives the drink hint", ok_water_adj and ok_water_far); fails += int(not (ok_water_adj and ok_water_far))
 	_set_terrain(Vector2i(40, 10), Terrain.GRASS)
 
+	# #8 tech gate: a bench-gated item places anywhere once a workbench EXISTS, and
+	# is refused everywhere when none does (gate by existence, not proximity).
+	for wbx in range(_terrain.size()):
+		if _terrain[wbx] == Terrain.WORKBENCH:
+			_terrain[wbx] = Terrain.GRASS   # start with no bench anywhere
+	_storage.clear()
+	_resources = _default_inventory(); _resources["wood"] = 20
+	var gate_c := Vector2i(10, 40)
+	_set_terrain(gate_c, Terrain.GRASS)
+	_cell = Vector2i(20, 20); _player_pos = _cell_center_world(_cell)   # far from gate_c + any bench
+	_build_struct = "storage"; _drag_action = BuildAction.BUILD
+	_apply_build_at(gate_c)
+	var ok_gate_locked: bool = _terrain_at(gate_c) == Terrain.GRASS
+	_set_terrain(Vector2i(45, 45), Terrain.WORKBENCH)   # a bench somewhere far away
+	_apply_build_at(gate_c)
+	var ok_gate_unlocked: bool = _terrain_at(gate_c) == Terrain.STORAGE
+	_report("workbench gates by existence, not proximity", ok_gate_locked and ok_gate_unlocked); fails += int(not (ok_gate_locked and ok_gate_unlocked))
+	_set_terrain(Vector2i(45, 45), Terrain.GRASS); _set_terrain(gate_c, Terrain.GRASS); _storage.clear()
+
+	# Menu overhaul: tabs switch panels mutually-exclusively; inventory categorizes.
+	_is_night = false
+	_select_tab("build")
+	var ok_tab_build: bool = _build_mode and not _craft_open and not _inv_open and _current_tab() == "build"
+	_select_tab("craft")
+	var ok_tab_craft: bool = _craft_open and not _build_mode and not _inv_open and _current_tab() == "craft"
+	_select_tab("items")
+	var ok_tab_items: bool = _inv_open and not _craft_open and _current_tab() == "items"
+	_select_tab("help")
+	var ok_tab_help: bool = not _inv_open and not _craft_open and not _build_mode and _current_tab() == "help"
+	_report("panel tabs switch mutually-exclusively", ok_tab_build and ok_tab_craft and ok_tab_items and ok_tab_help)
+	fails += int(not (ok_tab_build and ok_tab_craft and ok_tab_items and ok_tab_help))
+	var ok_cat: bool = _item_category("wood") == "Materials" and _item_category("spear") == "Tools & Weapons" \
+		and _item_category("banana") == "Food & Drink" and _item_category("worm") == "Critters"
+	_report("inventory items categorize correctly", ok_cat); fails += int(not ok_cat)
+	_select_tab("help")
+
+	# Bee engine -- agriculture: an apiary pollinates a nearby planter for bonus yield.
+	_apiaries.clear(); _planters.clear()
+	_set_terrain(Vector2i(30, 18), Terrain.BEE_ENCLOSURE); _set_terrain(Vector2i(31, 18), Terrain.PLANTER)
+	var b_api := _cell_index(Vector2i(30, 18)); var b_pli := _cell_index(Vector2i(31, 18))
+	_apiaries[b_api] = {"bees": 1, "prod": 0.0, "starve": 0.0}
+	_planters[b_pli] = {"planted": true, "berries": 1, "grow": 0.0, "wet": PLANTER_DRY}
+	_resources = _default_inventory()
+	_utility_tick(BEE_PROD_TIME + 0.5)   # apiary makes honey -> pollinates the planter
+	var ok_pollin_set: bool = int(_planters[b_pli].get("pollin", 0)) >= 1 and _inv("honey") >= 1
+	_planters[b_pli]["berries"] = 1; _resources["berry"] = 0
+	_planter_harvest(b_pli)
+	var ok_pollin_yield: bool = _inv("berry") == 2   # 1 berry + 1 pollination bonus
+	_report("bees pollinate planters for bonus yield", ok_pollin_set and ok_pollin_yield)
+	fails += int(not (ok_pollin_set and ok_pollin_yield))
+	_apiaries.clear(); _planters.clear()
+	_set_terrain(Vector2i(30, 18), Terrain.GRASS); _set_terrain(Vector2i(31, 18), Terrain.GRASS)
+
+	# Bee engine -- beeswax molds: cast a metal tool from beeswax + metal in the kiln.
+	_kilns.clear()
+	_set_terrain(Vector2i(28, 18), Terrain.KILN)
+	var b_kci := _cell_index(Vector2i(28, 18))
+	_kilns[b_kci] = {"fuel": KILN_FUEL_MAX, "queue": [], "conv": 0.0}
+	_resources = _default_inventory(); _resources["beeswax"] = 1; _resources["metal"] = 2
+	_kiln_cast(b_kci, {"beeswax": 1, "metal": 2}, "metal_tool")
+	var ok_cast_queued: bool = (_kilns[b_kci]["queue"] as Array).size() == 1 and _inv("beeswax") == 0 and _inv("metal") == 0
+	_utility_tick(KILN_TICK + 0.1)
+	var ok_cast_done: bool = _inv("metal_tool") == 1
+	_report("beeswax mold casts a metal tool", ok_cast_queued and ok_cast_done)
+	fails += int(not (ok_cast_queued and ok_cast_done))
+	_set_terrain(Vector2i(28, 18), Terrain.GRASS); _kilns.clear()
+
+	# Bee engine -- cooking: glaze a skewer with honey, cook it, and it feeds + heals.
+	_resources = _default_inventory(); _resources["fish_skewer"] = 1; _resources["honey"] = 1
+	_craft("honey_skewer")
+	var ok_glaze_craft: bool = _inv("honey_skewer") == 1 and _inv("fish_skewer") == 0 and _inv("honey") == 0
+	_campfires.clear()
+	_set_terrain(Vector2i(27, 18), Terrain.CAMPFIRE); var b_cfi := _cell_index(Vector2i(27, 18))
+	_campfires[b_cfi] = {"item": "", "cook": 0.0}
+	_campfire_put(b_cfi, "honey_skewer")
+	_utility_tick(COOK_TIME + 0.1)
+	_campfire_take(b_cfi)
+	var ok_glaze_cook: bool = _inv("honey_cooked") == 1
+	_energy = 10.0; _try_eat()
+	var ok_glaze_eat: bool = _inv("honey_cooked") == 0 and _energy > 10.0
+	_report("honey-glazed skewer: craft, cook, and eat", ok_glaze_craft and ok_glaze_cook and ok_glaze_eat)
+	fails += int(not (ok_glaze_craft and ok_glaze_cook and ok_glaze_eat))
+	_set_terrain(Vector2i(27, 18), Terrain.GRASS); _campfires.clear()
+	# Raw honey is a quick snack on its own.
+	_resources = _default_inventory(); _resources["honey"] = 1; _energy = 50.0
+	_try_eat()
+	var ok_honey_eat: bool = _inv("honey") == 0 and _energy > 50.0
+	_report("raw honey is edible", ok_honey_eat); fails += int(not ok_honey_eat)
+
 	_nights_survived = 0; _init_progression(); _day = 1; _resources = _default_inventory()
 
 	print("SELFTEST DONE, failures=%d" % fails)
@@ -7532,6 +7844,18 @@ func _handle_shot_arg() -> void:
 			_recompute_player_stats()
 			_stat_points = 1
 			_choosing_levelup = true
+			_refresh_context_panel()
+			_update_status()
+		if "--items" in args:
+			# Showcase the tabbed panel + categorized Items tab with equipped gear.
+			_resources = _default_inventory()
+			for kv in [["wood", 12], ["stone", 7], ["metal", 3], ["rope", 2],
+					["banana", 4], ["berry", 6], ["cup_water", 2], ["honey", 3],
+					["stone_tool", 1], ["spear", 1], ["sling_ammo", 14], ["worm", 2], ["bee", 1]]:
+				_resources[kv[0]] = kv[1]
+			_tool_equipped = "stone_tool"; _weapon_equipped = "spear"
+			_recompute_player_stats()
+			_inv_open = true
 			_refresh_context_panel()
 			_update_status()
 		if "--turretfight" in args:
