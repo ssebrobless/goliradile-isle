@@ -83,6 +83,15 @@ const FP_REGROW_BUSHES: int = 2
 const FP_REGROW_COCONUTS: int = 1
 const FP_REGROW_BAMBOO: int = 1
 const FP_REGROW_HIVES: int = 0
+const FP_NAV_WALL_WEIGHT: float = 1.0
+const FP_NAV_REPLAN_CELLS: int = 2
+const FP_NAV_REPLAN_SECS: float = 0.4
+const FP_NAV_BLOCKED_FRAMES: int = 8
+const FP_NAV_PROBE_STEPS: int = 1500
+const FP_NAV_PROBE_DT: float = 0.05
+const FP_NAV_CROWDED_PROBE_SEEDS: int = 3
+const FP_NAV_CROWDED_PROBE_CROCS: int = 36
+const FP_NAV_CROWDED_GOAL_STEPS: int = 260
 const FP_TURRET_POWER_RATE_MULT: float = 0.75
 const FP_COUNTER_MATRIX := {
 	"physical": {"swarm": 1.25, "armored": 0.75, "single": 1.0, "support": 1.0},
@@ -460,7 +469,6 @@ const MONSTER_CAP: int = FP_MONSTER_CAP
 const SPAWN_MIN_DIST: int = 11         # spawn at least this far from the player
 const FIELD_INF: float = 1.0e9
 const FIELD_BLOCKED: int = 100000000
-const FLOW_PLAYER_INTERVAL: float = 0.20
 # Phase 10: the required-progression ramp. Past this night the horde + fuel burn
 # outpace hand-poured wine, so turrets must be wired to a generator (powered = no burn).
 const POWER_DEMAND_NIGHT: int = 6
@@ -1040,14 +1048,13 @@ var _won: bool = false
 var _is_night: bool = false
 var _dusk_telegraphed: bool = false
 var _incoming_telegraphed: bool = false
-var _field_tree: PackedFloat32Array = PackedFloat32Array()
-var _field_player: PackedFloat32Array = PackedFloat32Array()
 # Sapper tunnel field: a tree-rooted flow that IGNORES wall break-cost, so a
 # burrowed digger routes straight under a sealed perimeter to the Tree.
 var _field_sapper: PackedFloat32Array = PackedFloat32Array()
 var _field_tree_dirty: bool = true
-var _field_player_timer: float = 0.0
-var _field_player_cell: Vector2i = Vector2i(-9999, -9999)
+var _nav: AStarGrid2D = null
+var _nav_epoch: int = 0
+var _nav_dirty: bool = true
 var _monsters: Array = []          # [{pos, hp, type, role, ...}, ...]
 var _projectiles: Array = []       # [{pos, vel, kind, dmg}, ...] kind = "fire"|"snow"
 var _poison_clouds: Array = []     # [{pos, t}] purple lingering smoke
@@ -1165,6 +1172,7 @@ func _ready() -> void:
 	_player_pos = _cell_center_world(_cell)
 	_invalidate_flow_fields()
 	_ensure_flow_fields()
+	_ensure_nav_grid()
 
 	_camera = Camera2D.new()
 	_camera.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
@@ -1631,44 +1639,164 @@ func _spawn_monsters(n: int) -> void:
 
 func _invalidate_flow_fields() -> void:
 	_field_tree_dirty = true
-	_field_player_timer = FLOW_PLAYER_INTERVAL
-	_field_player_cell = Vector2i(-9999, -9999)
+	_nav_dirty = true
 
 
 func _ensure_flow_fields() -> void:
-	if _field_tree_dirty or _field_tree.size() != GRID_CELLS * GRID_CELLS:
-		_recompute_tree_field()
-	if _field_player.size() != GRID_CELLS * GRID_CELLS:
-		_recompute_player_field(true)
+	if _field_tree_dirty or _field_sapper.size() != GRID_CELLS * GRID_CELLS:
+		_recompute_sapper_field()
 
 
-func _tick_flow_fields(delta: float) -> void:
-	if _field_tree_dirty or _field_tree.size() != GRID_CELLS * GRID_CELLS:
-		_recompute_tree_field()
-	_field_player_timer += delta
-	var pc := _world_to_cell(_player_pos)
-	if _field_player.size() != GRID_CELLS * GRID_CELLS \
-			or pc != _field_player_cell \
-			or _field_player_timer >= FLOW_PLAYER_INTERVAL:
-		_recompute_player_field(true)
+func _tick_flow_fields(_delta: float) -> void:
+	_ensure_flow_fields()
+
+
+func _ensure_nav_grid() -> void:
+	if _nav == null:
+		_rebuild_nav_grid()
+	elif _nav_dirty:
+		_rebuild_nav_grid()
+
+
+func _rebuild_nav_grid() -> void:
+	_nav = AStarGrid2D.new()
+	_nav.region = Rect2i(0, 0, GRID_CELLS, GRID_CELLS)
+	_nav.cell_size = Vector2(CELL_SIZE, CELL_SIZE)
+	_nav.offset = Vector2(CELL_SIZE, CELL_SIZE) * 0.5
+	_nav.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+	_nav.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	_nav.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	_nav.jumping_enabled = false
+	_nav.update()
+	for y in range(GRID_CELLS):
+		for x in range(GRID_CELLS):
+			_sync_nav_cell(Vector2i(x, y), false)
+	_nav_dirty = false
+	_nav_epoch += 1
+
+
+func _nav_weight_for_cell(c: Vector2i) -> float:
+	var t := _terrain_at(c)
+	var hp := _tile_break_hp(t)
+	if hp > 0:
+		return 1.0 + float(hp + _tile_armor(t) * 8) * FP_NAV_WALL_WEIGHT
+	return 1.0
+
+
+func _sync_nav_cell(c: Vector2i, bump_epoch: bool = true) -> void:
+	if _nav == null or not _in_bounds(c):
+		return
+	var t := _terrain_at(c)
+	if _tile_impassable(t):
+		_nav.set_point_solid(c, true)
+		_nav.set_point_weight_scale(c, 1.0)
+	else:
+		_nav.set_point_solid(c, false)
+		_nav.set_point_weight_scale(c, _nav_weight_for_cell(c))
+	if bump_epoch:
+		_nav_epoch += 1
+
+
+func _nav_goal_cell_for_croc(m: Dictionary) -> Vector2i:
+	if String(m.get("target", "player")) == "tree":
+		return _nearest_tree_cell_to(m["pos"])
+	return _world_to_cell(_player_pos)
+
+
+func _nav_replan_delay(index: int) -> float:
+	var slots := maxi(1, _monsters.size())
+	var stagger := float(index % slots) / float(slots)
+	return FP_NAV_REPLAN_SECS * (1.0 + stagger)
+
+
+func _croc_path(m: Dictionary) -> PackedVector2Array:
+	var raw: Variant = m.get("path", PackedVector2Array())
+	if raw is PackedVector2Array:
+		return raw
+	var out := PackedVector2Array()
+	if raw is Array:
+		for p in raw:
+			if p is Vector2:
+				out.append(p)
+	return out
+
+
+func _plan_croc_path(m: Dictionary, goal_cell: Vector2i, index: int) -> void:
+	_ensure_nav_grid()
+	var start := _world_to_cell(m["pos"])
+	var path := PackedVector2Array()
+	if _nav != null and _in_bounds(start) and _in_bounds(goal_cell):
+		path = _nav.get_point_path(start, goal_cell, true)
+	m["path"] = path
+	m["path_i"] = 0
+	m["plan_epoch"] = _nav_epoch
+	m["plan_goal"] = goal_cell
+	m["replan_t"] = _nav_replan_delay(index)
+	m["blocked_frames"] = 0
+
+
+func _croc_needs_replan(m: Dictionary, goal_cell: Vector2i) -> bool:
+	var path := _croc_path(m)
+	var path_i := int(m.get("path_i", 0))
+	if path.is_empty():
+		return true
+	if path_i >= path.size() and _world_to_cell(m["pos"]) != goal_cell:
+		return true
+	if int(m.get("plan_epoch", -1)) != _nav_epoch:
+		return true
+	var plan_goal: Vector2i = m.get("plan_goal", Vector2i(-9999, -9999))
+	if String(m.get("target", "player")) != "tree" and _chebyshev(plan_goal, goal_cell) >= FP_NAV_REPLAN_CELLS:
+		return true
+	if float(m.get("replan_t", 0.0)) <= 0.0:
+		return true
+	if int(m.get("blocked_frames", 0)) >= FP_NAV_BLOCKED_FRAMES and float(m.get("brk_cd", 0.0)) <= 0.0:
+		return true
+	return false
+
+
+func _nav_dir_for_croc(m: Dictionary, target_pos: Vector2, delta: float, index: int) -> Vector2:
+	m["replan_t"] = maxf(0.0, float(m.get("replan_t", 0.0)) - delta)
+	var goal_cell := _nav_goal_cell_for_croc(m)
+	if _croc_needs_replan(m, goal_cell):
+		_plan_croc_path(m, goal_cell, index)
+	var path := _croc_path(m)
+	var path_i := clampi(int(m.get("path_i", 0)), 0, path.size())
+	var pos: Vector2 = m["pos"]
+	while path_i < path.size() and pos.distance_to(path[path_i]) <= CELL_SIZE * 0.4:
+		path_i += 1
+	m["path_i"] = path_i
+	if path_i < path.size():
+		var to_waypoint := path[path_i] - pos
+		if to_waypoint.length() > 0.01:
+			return to_waypoint.normalized()
+	var fallback := target_pos - pos
+	return fallback.normalized() if fallback.length() > 0.01 else Vector2.ZERO
+
+
+func _nav_move_monster_toward(m: Dictionary, dir: Vector2, delta: float, speed: float) -> void:
+	var before: Vector2 = m["pos"]
+	var effective_speed := speed
+	if float(m.get("slow_t", 0.0)) > 0.0:
+		effective_speed *= 0.5
+	effective_speed *= _adhesive_factor(before)
+	_move_monster_toward(m, dir, delta, speed)
+	var intended := effective_speed * delta
+	var moved := (m["pos"] as Vector2).distance_to(before)
+	if intended <= 0.01 or moved >= intended * 0.5 or float(m.get("brk_cd", 0.0)) > 0.0:
+		m["blocked_frames"] = 0
+	else:
+		m["blocked_frames"] = int(m.get("blocked_frames", 0)) + 1
 
 
 func _flow_tree_goals() -> Array:
 	return _tree_cells()
 
 
-func _recompute_tree_field() -> void:
-	_field_tree = _recompute_flow_field(_flow_tree_goals())
+func _recompute_sapper_field() -> void:
 	# The sapper's tunnel field shares the Tree goal but treats walls as cheap
 	# dirt (ignore_break) -- this is the path that crosses a sealed wall ring.
 	_field_sapper = _recompute_flow_field(_flow_tree_goals(), true)
 	_field_tree_dirty = false
-
-
-func _recompute_player_field(_force: bool = false) -> void:
-	_field_player_cell = _world_to_cell(_player_pos)
-	_field_player = _recompute_flow_field([_field_player_cell])
-	_field_player_timer = 0.0
 
 
 func _flow_step_cost(c: Vector2i, ignore_break: bool = false) -> int:
@@ -1824,10 +1952,14 @@ func _regrow_world() -> void:
 
 
 func _monster_update(delta: float) -> void:
+	_ensure_nav_grid()
 	_tick_flow_fields(delta)
 	_apply_heal_auras(delta)   # white crocs mend nearby allies (and flag them)
 
+	var nav_i := 0
 	for m in _monsters:
+		var croc_nav_i := nav_i
+		nav_i += 1
 		m["flash"] = maxf(0.0, m["flash"] - delta)
 
 		# Down but not out: black crocs lie dead, counting to their single revive.
@@ -1869,11 +2001,6 @@ func _monster_update(delta: float) -> void:
 		var to: Vector2 = target_pos - m["pos"]
 		var dist: float = to.length()
 		var dir: Vector2 = to / dist if dist > 0.01 else Vector2.RIGHT
-		var chase_field := _field_tree if target_tree else _field_player
-		var chase_dir := _flow_dir_from_pos(chase_field, m["pos"], dir)
-		var sep := _monster_separation(m["pos"])
-		if sep != Vector2.ZERO and not m["dig"]:
-			chase_dir = (chase_dir + sep * 0.35).normalized()
 
 		# Sapper: a tree-aggro digger gets its dedicated tunnel logic FIRST, so the
 		# generic tree-seek branch below never swallows it. While burrowed it follows
@@ -1882,23 +2009,29 @@ func _monster_update(delta: float) -> void:
 			_update_digger(m, delta, dir, dist, target_pos)
 			continue
 
+		if role == "wrecker":
+			_update_wrecker(m, delta, dir)
+			continue
+
+		var chase_dir := _nav_dir_for_croc(m, target_pos, delta, croc_nav_i)
+		var sep := _monster_separation(m["pos"])
+		if sep != Vector2.ZERO and not m["dig"]:
+			chase_dir = (chase_dir + sep * 0.35).normalized()
+
 		if target_tree:
 			if dist <= ATTACK_RANGE + CELL_SIZE * 0.35:
 				if float(m["attack"]) > 0.0 and m["atk_cd"] <= 0.0:
 					_damage_tree(float(m["attack"]))
 					m["atk_cd"] = MONSTER_ATK_INTERVAL
 				continue
-			_move_monster_toward(m, chase_dir, delta, m["speed"])
+			_nav_move_monster_toward(m, chase_dir, delta, m["speed"])
 			continue
 
 		match role:
 			"healer":
 				# Support unit: never attacks; trails the pack, keeping its distance.
 				if dist > CELL_SIZE * 3.5:
-					_move_monster_toward(m, chase_dir, delta, m["speed"] * 0.85)
-				continue
-			"wrecker":
-				_update_wrecker(m, delta, dir)
+					_nav_move_monster_toward(m, chase_dir, delta, m["speed"] * 0.85)
 				continue
 			"poison":
 				if dist <= PURPLE_RANGE:
@@ -1919,7 +2052,7 @@ func _monster_update(delta: float) -> void:
 				_damage_player(m["attack"], m["pos"])
 				m["atk_cd"] = MONSTER_ATK_INTERVAL
 			continue
-		_move_monster_toward(m, chase_dir, delta, m["speed"])
+		_nav_move_monster_toward(m, chase_dir, delta, m["speed"])
 
 	# Remove dead -- but keep black crocs still owing a revive (no XP on first kill).
 	var alive := []
@@ -2083,7 +2216,7 @@ func _update_digger(m: Dictionary, delta: float, dir: Vector2, dist: float, targ
 			_damage_tree(float(m["attack"]))
 			m["atk_cd"] = MONSTER_ATK_INTERVAL
 		return
-	var chase_dir := _flow_dir_from_pos(_field_tree, m["pos"], dir)
+	var chase_dir := _flow_dir_from_pos(_field_sapper, m["pos"], dir)
 	_move_monster_toward(m, chase_dir, delta, m["speed"])
 
 
@@ -5677,7 +5810,6 @@ func _set_terrain(c: Vector2i, t: int) -> void:
 	_terrain[i] = t
 	if old_t != t:
 		_field_tree_dirty = true
-		_field_player_timer = FLOW_PLAYER_INTERVAL
 	if t != Terrain.WRECK:
 		_wrecks.erase(i)
 	_growth[i] = 0.0
@@ -5685,6 +5817,11 @@ func _set_terrain(c: Vector2i, t: int) -> void:
 		_banana[i] = 0
 	if t != Terrain.BUSH:
 		_berry[i] = 0
+	if old_t != t:
+		if _nav == null:
+			_nav_dirty = true
+		else:
+			_sync_nav_cell(c)
 
 
 func _terrain_at(c: Vector2i) -> int:
@@ -7419,6 +7556,7 @@ func _deserialize_state(d: Dictionary) -> void:
 	_compute_pool_shore()
 	_invalidate_flow_fields()
 	_ensure_flow_fields()
+	_ensure_nav_grid()
 	_recompute_player_stats()
 	_build_mode = false
 	_build_struct = ""
@@ -9999,25 +10137,41 @@ func _inventory_flow_evidence() -> Dictionary:
 	return {"produced": produced, "consumed": consumed}
 
 
+func _pathing_reached(pos: Vector2, target_pos: Vector2) -> bool:
+	return pos.distance_to(target_pos) <= ATTACK_RANGE + CELL_SIZE * 0.35
+
+
+func _nav_reachable_cells(start: Vector2i, goal: Vector2i) -> bool:
+	_ensure_nav_grid()
+	if _nav == null or not _in_bounds(start) or not _in_bounds(goal):
+		return false
+	var path := _nav.get_point_path(start, goal, false)
+	return path.size() > 0
+
+
+func _pathing_acceptance_ok(r: Dictionary) -> bool:
+	var total := maxi(1, int(r["crocs"]))
+	var arrived := int(r["reached"]) + int(r["walled_off"])
+	var needed := int(ceil(float(total) * 0.98))
+	return arrived >= needed and int(r["wedged"]) == 0
+
+
 func _pathing_probe_result(seed_count: int = 20, crocs_per_seed: int = 20) -> Dictionary:
 	var total := 0
 	var reached := 0
-	var stuck := 0
-	var steps := 700
-	var dt := 0.05
-	var saved_seed := _seed
-	var saved_monsters := _monsters
-	var saved_cell := _cell
-	_monsters = []
+	var walled_off := 0
+	var wedged := 0
+	var snap := _serialize_state().duplicate(true)
 
 	for si in range(seed_count):
 		_seed = WORLD_SEED + si
 		seed(_seed)
 		_generate_world()
 		_ensure_flow_fields()
+		_ensure_nav_grid()
 		var rng := RandomNumberGenerator.new()
 		rng.seed = _seed + 99173
-		for _ci in range(crocs_per_seed):
+		for ci in range(crocs_per_seed):
 			var start := Vector2i(-1, -1)
 			var tries := 0
 			while tries < 900 and start.x < 0:
@@ -10029,37 +10183,193 @@ func _pathing_probe_result(seed_count: int = 20, crocs_per_seed: int = 20) -> Di
 				continue
 			total += 1
 			var start_pos := _cell_center_world(start)
-			var m := {
-				"pos": start_pos, "slow_t": 0.0, "brk_cd": 0.0,
-			}
+			var m := _mk_croc(start_pos, MONSTER_HP, "green")
+			m["target"] = "tree"
 			var hit_tree := false
-			for _step in range(steps):
+			for _step in range(FP_NAV_PROBE_STEPS):
 				var pos: Vector2 = m["pos"]
-				if pos.distance_to(_cell_center_world(_nearest_tree_cell_to(pos))) <= CELL_SIZE * 1.6:
+				var target_pos := _cell_center_world(_nearest_tree_cell_to(pos))
+				if _pathing_reached(pos, target_pos):
 					hit_tree = true
 					break
-				var fallback := _cell_center_world(_nearest_tree_cell_to(pos)) - pos
-				var dir := _flow_dir_from_pos(_field_tree, pos, fallback)
-				_move_monster_toward(m, dir, dt, CROC_SPEED)
+				var dir := _nav_dir_for_croc(m, target_pos, FP_NAV_PROBE_DT, ci)
+				_nav_move_monster_toward(m, dir, FP_NAV_PROBE_DT, CROC_SPEED)
 			if hit_tree:
 				reached += 1
-			elif (m["pos"] as Vector2).distance_to(start_pos) < CELL_SIZE * 0.5:
-				stuck += 1
+			else:
+				var here := _world_to_cell(m["pos"])
+				var goal := _nearest_tree_cell_to(m["pos"])
+				if _nav_reachable_cells(here, goal):
+					wedged += 1
+				else:
+					walled_off += 1
 
-	_seed = saved_seed
-	_cell = saved_cell
-	_monsters = saved_monsters
+	_deserialize_state(snap)
+	return {"seeds": seed_count, "crocs": total, "reached": reached, "walled_off": walled_off, "wedged": wedged}
+
+
+func _pathing_probe_goal_cells() -> Array:
+	var center := _tree_center_cell()
+	return [
+		center + Vector2i(0, 8),
+		center + Vector2i(8, 8),
+		center + Vector2i(-8, 8),
+		center + Vector2i(8, -8),
+		center + Vector2i(-8, -8),
+	]
+
+
+func _clear_pathing_probe_goal_area(goals: Array) -> void:
+	for g in goals:
+		var gc: Vector2i = g
+		for oy in range(-2, 3):
+			for ox in range(-2, 3):
+				var c := gc + Vector2i(ox, oy)
+				if _in_bounds(c) and not _tree_cells().has(c):
+					_set_terrain(c, Terrain.GRASS)
+
+
+func _pathing_crowded_probe_result(seed_count: int = FP_NAV_CROWDED_PROBE_SEEDS, crocs_per_seed: int = FP_NAV_CROWDED_PROBE_CROCS) -> Dictionary:
+	var total := 0
+	var reached := 0
+	var walled_off := 0
+	var wedged := 0
+	var snap := _serialize_state().duplicate(true)
+
+	for si in range(seed_count):
+		_seed = WORLD_SEED + 7000 + si
+		seed(_seed)
+		_generate_world()
+		var goals := _pathing_probe_goal_cells()
+		_clear_pathing_probe_goal_area(goals)
+		_ensure_flow_fields()
+		_ensure_nav_grid()
+		_is_night = true
+		_health = 999999.0
+		_downed = false
+		_projectiles = []
+		_poison_clouds = []
+		_monsters = []
+		_cell = goals[0]
+		_player_pos = _cell_center_world(_cell)
+
+		var rng := RandomNumberGenerator.new()
+		rng.seed = _seed + 314159
+		var tries := 0
+		while _monsters.size() < crocs_per_seed and tries < crocs_per_seed * 300:
+			tries += 1
+			var c := Vector2i(rng.randi_range(0, GRID_CELLS - 1), rng.randi_range(0, GRID_CELLS - 1))
+			if not _tile_monster_walk(_terrain_at(c)) or _chebyshev(c, _cell) < 18:
+				continue
+			if not _nav_reachable_cells(c, _cell):
+				continue
+			var m := _mk_croc(_cell_center_world(c), MONSTER_HP, "green")
+			m["target"] = "player"
+			m["probe_id"] = "%d:%d" % [si, _monsters.size()]
+			_monsters.append(m)
+		total += _monsters.size()
+
+		var reached_ids := {}
+		for step in range(FP_NAV_PROBE_STEPS):
+			var goal_i := int(step / FP_NAV_CROWDED_GOAL_STEPS) % goals.size()
+			_cell = goals[goal_i]
+			_player_pos = _cell_center_world(_cell)
+			_monster_update(FP_NAV_PROBE_DT)
+			for m in _monsters:
+				var pid := String(m.get("probe_id", ""))
+				if pid == "" or reached_ids.has(pid):
+					continue
+				if _pathing_reached(m["pos"], _player_pos):
+					reached_ids[pid] = true
+		reached += reached_ids.size()
+		for m in _monsters:
+			var pid := String(m.get("probe_id", ""))
+			if pid != "" and reached_ids.has(pid):
+				continue
+			if _nav_reachable_cells(_world_to_cell(m["pos"]), _world_to_cell(_player_pos)):
+				wedged += 1
+			else:
+				walled_off += 1
+
+	_deserialize_state(snap)
+	return {"seeds": seed_count, "crocs": total, "reached": reached, "walled_off": walled_off, "wedged": wedged}
+
+
+func _pathing_tree_wall_probe_result(croc_count: int = 12) -> Dictionary:
+	var snap := _serialize_state().duplicate(true)
+	_seed = WORLD_SEED + 9100
+	seed(_seed)
 	_generate_world()
 	_ensure_flow_fields()
-	return {"seeds": seed_count, "crocs": total, "reached": reached, "stuck": stuck}
+	_ensure_nav_grid()
+	_is_night = true
+	_health = 999999.0
+	_tree_hp = 999999.0
+	_monsters = []
+	_projectiles = []
+	_poison_clouds = []
+
+	var center := _tree_center_cell()
+	var ring := []
+	for x in range(center.x - 2, center.x + 3):
+		ring.append(Vector2i(x, center.y - 2))
+		ring.append(Vector2i(x, center.y + 2))
+	for y in range(center.y - 1, center.y + 2):
+		ring.append(Vector2i(center.x - 2, y))
+		ring.append(Vector2i(center.x + 2, y))
+	for c in ring:
+		if _in_bounds(c) and not _tree_cells().has(c):
+			_set_terrain(c, Terrain.WOOD_WALL)
+	var ring_count := ring.size()
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _seed + 2718
+	var tries := 0
+	while _monsters.size() < croc_count and tries < croc_count * 300:
+		tries += 1
+		var c := Vector2i(rng.randi_range(0, GRID_CELLS - 1), rng.randi_range(0, GRID_CELLS - 1))
+		if not _tile_monster_walk(_terrain_at(c)) or _chebyshev(c, center) < 18:
+			continue
+		if not _nav_reachable_cells(c, _nearest_tree_cell_to(_cell_center_world(c))):
+			continue
+		var m := _mk_croc(_cell_center_world(c), MONSTER_HP, "green")
+		m["target"] = "tree"
+		m["probe_id"] = "wall:%d" % _monsters.size()
+		_monsters.append(m)
+
+	var reached_ids := {}
+	for _step in range(FP_NAV_PROBE_STEPS):
+		_monster_update(FP_NAV_PROBE_DT)
+		for m in _monsters:
+			var pid := String(m.get("probe_id", ""))
+			if pid == "" or reached_ids.has(pid):
+				continue
+			var target_pos := _cell_center_world(_nearest_tree_cell_to(m["pos"]))
+			if _pathing_reached(m["pos"], target_pos):
+				reached_ids[pid] = true
+
+	var broken := 0
+	for c in ring:
+		if _in_bounds(c) and _terrain_at(c) != Terrain.WOOD_WALL:
+			broken += 1
+	var reached := reached_ids.size()
+	var spawned := _monsters.size()
+	_deserialize_state(snap)
+	return {"crocs": spawned, "reached": reached, "ring": ring_count, "broken": broken}
 
 
 func _run_pathing_probe() -> void:
-	var r := _pathing_probe_result(20, 20)
-	print("PATHING_PROBE seeds=%d crocs=%d reached_tree=%d stuck_whole_run=%d" % [
-		int(r["seeds"]), int(r["crocs"]), int(r["reached"]), int(r["stuck"]),
+	var solo := _pathing_probe_result(20, 20)
+	var crowded := _pathing_crowded_probe_result()
+	print("PATHING_PROBE solo seeds=%d crocs=%d reached=%d walled_off=%d wedged=%d pass=%s" % [
+		int(solo["seeds"]), int(solo["crocs"]), int(solo["reached"]),
+		int(solo["walled_off"]), int(solo["wedged"]), str(_pathing_acceptance_ok(solo)),
 	])
-	get_tree().quit(0)
+	print("PATHING_PROBE crowded seeds=%d crocs=%d reached=%d walled_off=%d wedged=%d pass=%s" % [
+		int(crowded["seeds"]), int(crowded["crocs"]), int(crowded["reached"]),
+		int(crowded["walled_off"]), int(crowded["wedged"]), str(_pathing_acceptance_ok(crowded)),
+	])
+	get_tree().quit(0 if _pathing_acceptance_ok(solo) and _pathing_acceptance_ok(crowded) else 1)
 
 
 func _run_selftest() -> void:
@@ -10108,20 +10418,27 @@ func _run_selftest() -> void:
 			_set_terrain(rc, Terrain.GRASS)
 	for tid in Terrain.values():
 		_set_terrain(pc, tid)
-		# Pather: cost 1 means freely walkable (no break/impassable involved).
-		var pather_walk := _flow_step_cost(pc) == 1
-		# Collider: real-sized bodies at the cell centre must agree with TILE_DEF.
+		_ensure_nav_grid()
+		# A* mirrors the monster route semantics: hard impassables are solid,
+		# breakables are weighted-but-routeable, and free tiles are open.
+		var nav_solid := _nav.is_point_solid(pc)
 		var coll_monster := not _box_blocked(pcen, MONSTER_RADIUS, true)
 		var coll_player := not _box_blocked(pcen, PLAYER_RADIUS, false)
-		if pather_walk != _tile_monster_walk(tid):
-			ok_walk_agree = false
-		if coll_monster != _tile_monster_walk(tid):
+		if _tile_impassable(tid):
+			if not nav_solid or coll_monster:
+				ok_walk_agree = false
+		elif _tile_break_hp(tid) > 0:
+			if nav_solid or coll_monster:
+				ok_walk_agree = false
+		elif nav_solid or coll_monster != _tile_monster_walk(tid):
 			ok_walk_agree = false
 		if coll_player != _tile_player_walk(tid):
 			ok_walk_agree = false
 	for idx in pc_orig:
 		_terrain[idx] = pc_orig[idx]
-	_report("pather and collider walkability agree", ok_walk_agree); fails += int(not ok_walk_agree)
+	_invalidate_flow_fields()
+	_ensure_nav_grid()
+	_report("nav solidity and collider walkability agree", ok_walk_agree); fails += int(not ok_walk_agree)
 
 	var corner_patch := {}
 	for y in range(28, 33):
@@ -10137,6 +10454,8 @@ func _run_selftest() -> void:
 	var ok_corner_progress := (corner_croc["pos"] as Vector2).distance_to(corner_start) > CELL_SIZE * 0.25
 	for idx in corner_patch:
 		_terrain[idx] = corner_patch[idx]
+	_invalidate_flow_fields()
+	_ensure_nav_grid()
 	_report("radius croc makes progress at obstacle corner", ok_corner_progress); fails += int(not ok_corner_progress)
 
 	var ok_icons := true
@@ -10469,13 +10788,30 @@ func _run_selftest() -> void:
 	_cell = Vector2i(20, 20)
 	for yy in range(18, 22):
 		_set_terrain(Vector2i(22, yy), Terrain.STONE_WALL)
-	_recompute_player_field(true)
-	var detour_dir := _flow_dir_from_cell(_field_player, Vector2i(23, 20))
-	var ok_detour: bool = detour_dir.y > 0.25 and absf(detour_dir.x) < 0.25
-	_report("flow field detours through wall gap", ok_detour); fails += int(not ok_detour)
+	_ensure_nav_grid()
+	var detour_path := _nav.get_point_path(Vector2i(23, 20), Vector2i(20, 20), true)
+	var crosses_gap := false
+	var crosses_wall := false
+	for wp in detour_path:
+		var detour_cell := _world_to_cell(wp)
+		if detour_cell.x == 22 and (detour_cell.y < 18 or detour_cell.y > 21):
+			crosses_gap = true
+		if detour_cell.x == 22 and detour_cell.y >= 18 and detour_cell.y <= 21:
+			crosses_wall = true
+	var ok_detour: bool = detour_path.size() > 0 and crosses_gap and not crosses_wall
+	_report("nav path detours through wall gap", ok_detour); fails += int(not ok_detour)
 	for y in range(17, 24):
 		for x in range(19, 27):
 			_set_terrain(Vector2i(x, y), Terrain.GRASS)
+
+	var crowded_probe := _pathing_crowded_probe_result()
+	var ok_crowded_probe := _pathing_acceptance_ok(crowded_probe)
+	_report("crowded nav probe reaches moving player", ok_crowded_probe); fails += int(not ok_crowded_probe)
+	var wall_probe := _pathing_tree_wall_probe_result()
+	var ok_wall_probe := int(wall_probe["crocs"]) > 0 \
+		and int(wall_probe["broken"]) > 0 \
+		and int(wall_probe["reached"]) >= int(wall_probe["crocs"]) * 9 / 10
+	_report("real night nav crocs converge and breach tree wall", ok_wall_probe); fails += int(not ok_wall_probe)
 
 	# --- Monster behaviour (continuous) ---
 	_is_night = true
@@ -12356,6 +12692,8 @@ func _mk_croc(pos: Vector2, hp: float, type: String = "green") -> Dictionary:
 		"dig": CROC_DEFS[type]["role"] == "digger", "revived": false, "dead_t": 0.0, "healing": false,
 		"slow_t": 0.0, "stun_t": 0.0, "marked": false, "killer": "",
 		"target": "tree" if String(CROC_DEFS[type].get("aggro", "")) == "tree" else "player",
+		"path": PackedVector2Array(), "path_i": 0, "replan_t": 0.0,
+		"plan_epoch": -1, "plan_goal": Vector2i(-9999, -9999), "blocked_frames": 0,
 		"dmg_log": {}, "debuff_by": {},
 	}
 
