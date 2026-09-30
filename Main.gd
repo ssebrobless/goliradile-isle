@@ -28,7 +28,7 @@ extends Node2D
 const GRID_CELLS: int = 50
 const CELL_SIZE: float = 32.0
 const PLAYER_SPEED: float = 3.0 * CELL_SIZE   # pixels/second
-const CROC_SPEED: float = 3.0 * CELL_SIZE     # same as the player for now
+const CROC_SPEED: float = 2.6 * CELL_SIZE     # ~87% of player speed: you can outrun early crocs
 const PLAYER_RADIUS: float = CELL_SIZE * 0.34
 const MONSTER_RADIUS: float = CELL_SIZE * 0.34
 const CAMERA_ZOOM: float = 1.5
@@ -39,7 +39,7 @@ const PANEL_W: float = 280.0
 const ENERGY_MAX: float = 100.0
 const ENERGY_DRAIN: float = 0.4
 const ENERGY_NIGHT_EXTRA: float = 0.25
-const ENERGY_MOVE: float = 1.5         # per second while moving
+const ENERGY_MOVE: float = 0.75        # per second while moving
 const ENERGY_HARVEST: float = 1.5
 const ENERGY_BUILD: float = 0.5
 const EAT_RESTORE: float = 30.0
@@ -247,9 +247,9 @@ const TOOL_ITEMS := ["stone_tool", "metal_tool"]
 # a ranged weapon fires a projectile instead of swinging.
 const WEAPON_DEFS := {
 	"":          {"label": "Fists",     "dmg": 1.0, "reach": 1.0, "time": 1.0, "kb": 1.0, "ranged": false},
-	"mallet":    {"label": "Mallet",    "dmg": 2.4, "reach": 0.95, "time": 1.8, "kb": 2.4, "ranged": false},
-	"spear":     {"label": "Spear",     "dmg": 1.5, "reach": 1.9,  "time": 1.1, "kb": 1.0, "ranged": false},
-	"slingshot": {"label": "Slingshot", "dmg": 1.3, "reach": 1.0,  "time": 1.0, "kb": 0.6, "ranged": true},
+	"mallet":    {"label": "Mallet",    "dmg": 3.0, "reach": 0.95, "time": 1.8, "kb": 2.4, "ranged": false},
+	"spear":     {"label": "Spear",     "dmg": 1.8, "reach": 1.9,  "time": 1.1, "kb": 1.0, "ranged": false},
+	"slingshot": {"label": "Slingshot", "dmg": 1.6, "reach": 1.0,  "time": 1.0, "kb": 0.6, "ranged": true},
 }
 const WEAPON_ITEMS := ["slingshot", "mallet", "spear"]
 # One-line "what it does" blurbs for the equip strip -- so tools vs weapons (and
@@ -271,10 +271,17 @@ const SPARK_TIME: float = 0.18         # punch-connect spark duration
 const LOW_HP_FRAC: float = 0.35        # vignette shows below this health fraction
 const HITSTOP_HIT: float = 0.045       # brief freeze when the player lands a punch
 const HITSTOP_HURT: float = 0.075      # bigger freeze when the player gets hit
+const HURT_INVULN: float = 0.4         # grace period after a hit (no chain-stunning)
+const CROC_SEPARATION: float = 0.9     # crocs push apart when closer than this * 2 radii
+const CROC_PUSH_SPEED: float = 4.0 * CELL_SIZE  # max px/sec of separation push
 const MONSTER_BASE: int = 3            # monsters on night 1
-const MONSTER_PER_DAY: int = 2         # extra monsters each subsequent night
+const MONSTER_PER_DAY: float = 1.6     # extra monsters each subsequent night
 const MONSTER_CAP: int = 28
 const SPAWN_MIN_DIST: int = 11         # spawn at least this far from the player
+const COVER_PCT: int = 30              # % of trees/rocks that stay standing at night as cover
+const FLANK_NIGHT: int = 4             # from this night on, some crocs land on the map edge
+const FLANK_FRAC: float = 0.4          # share of a raid that flanks in from the edges
+const EDGE_BAND: int = 3               # flankers spawn within this many cells of the border
 # Phase 10: the required-progression ramp. Past this night the horde + fuel burn
 # outpace hand-poured wine, so turrets must be wired to a generator (powered = no burn).
 const POWER_DEMAND_NIGHT: int = 6
@@ -283,11 +290,11 @@ const HIDE_ARMOR_STEP: float = 0.04          # armor gained per hide_armor craft
 const HIDE_ARMOR_CAP: float = 0.30           # cap on gear armor from hides
 
 # --- Per-night monster escalation --------------------------------------------
-const MON_HP_GROW: float = 1.5
+const MON_HP_GROW: float = 1.3
 const MON_ATK_GROW: float = 1.5
 const MON_SPD_GROW: float = 0.06       # +6% speed per night
 const MON_SPD_CAP: float = 2.0         # max speed multiplier
-const MON_ARM_GROW: float = 0.03
+const MON_ARM_GROW: float = 0.02
 const MON_ARM_CAP: float = 0.5
 const MON_REGEN_GROW: float = 0.3      # hp/sec gained per night past the first
 const MON_XP_BASE: int = 3             # XP for killing a night-1 croc
@@ -296,7 +303,7 @@ const MON_XP_GROW: float = 2.0         # +XP per night -- deep-night kills level
 # --- Player leveling ----------------------------------------------------------
 const HEALTH_PER_LEVEL: float = 20.0
 const ATK_PER_LEVEL: float = 1.0
-const SPD_PER_LEVEL: float = 0.03
+const SPD_PER_LEVEL: float = 0.05
 const ARMOR_PER_LEVEL: float = 0.03
 const ARMOR_CAP: float = 0.6
 const REGEN_PER_LEVEL: float = 0.3
@@ -549,7 +556,7 @@ const REGROW_STRUCT_BUFFER: int = 1
 const NATURAL_BASELINE_MIN: int = 200   # fallback target if an old save lacks one
 
 # --- Colors ------------------------------------------------------------------
-const COLOR_GRID: Color = Color(0.0, 0.0, 0.0, 0.18)
+const COLOR_GRID: Color = Color(0.0, 0.0, 0.0, 0.07)
 const COLOR_PLAYER: Color = Color(1.0, 0.85, 0.1)
 const COLOR_FACE: Color = Color(0.15, 0.12, 0.0)
 const COLOR_FACE_HL: Color = Color(1.0, 1.0, 1.0, 0.85)
@@ -606,6 +613,26 @@ var _punch_hit: bool = false       # has this punch already connected?
 var _shake: float = 0.0
 var _hitstop: float = 0.0          # world-freeze timer for impact punch
 var _hurt_flash: float = 0.0
+var _invuln_t: float = 0.0         # seconds of post-hit invulnerability left
+
+# --- Audio (all synthesised in code -- no asset files) ---
+const SFX_RATE: int = 22050
+const MUSIC_RATE: int = 11025
+const MUSIC_LEN: float = 16.0          # seconds per music loop
+const SFX_VOICES: int = 8
+var _sfx_vol: float = 0.8
+var _music_vol: float = 0.5
+var _muted: bool = false
+var _sfx := {}                         # name -> AudioStreamWAV
+var _sfx_players: Array = []
+var _sfx_next: int = 0
+var _sfx_last := {}                    # name -> msec of last play (throttle)
+var _music_player: AudioStreamPlayer
+var _music := {}                       # "day"/"night" -> AudioStreamWAV (built on a thread)
+var _music_thread: Thread
+var _music_want: String = "day"
+var _music_cur: String = ""
+var _music_gain: float = 0.0           # 0..1 crossfade level
 var _spark_t: float = 1.0          # >=1 inactive
 var _spark_pos: Vector2 = Vector2.ZERO
 var _poofs: Array = []             # [{pos:Vector2, t:float}, ...]
@@ -736,6 +763,9 @@ var _canvas_mod: CanvasModulate
 # Baked pixel-art textures
 var _tiles := {}                  # Terrain -> ImageTexture
 var _tex_gorilla: ImageTexture
+var _grass_var: Array = []        # ImageTextures: plain / tufted / flowered / pebbly grass
+var _tex_glow: ImageTexture       # soft radial light sprite
+var _dmg_texts: Array = []        # [{pos:Vector2, text:String, t:float, col:Color}] floating numbers
 var _tex_croc_r: ImageTexture
 var _tex_croc_l: ImageTexture
 var _tex_croc_flash_r: ImageTexture
@@ -793,6 +823,8 @@ func _ready() -> void:
 	_build_ui()
 	_build_fx()
 	_build_menu_layer()
+	if not ("--selftest" in OS.get_cmdline_user_args()) and not ("--shot" in OS.get_cmdline_user_args()):
+		_audio_init()
 	_apply_daylight()
 	_update_status()
 	_refresh_context_panel()
@@ -809,6 +841,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_update_music(delta)
 	# Title / menu / settings: gameplay is paused behind the overlay.
 	if _app_state == AppState.SPLASH:
 		_tick_splash(delta)
@@ -827,6 +860,7 @@ func _process(delta: float) -> void:
 		queue_redraw()   # keep the frozen frame (with its hit-flash) on screen
 		return
 
+	_invuln_t = maxf(0.0, _invuln_t - delta)
 	_advance_time(delta)
 	_decay_tick(delta)   # loose food spoils over time, day or night
 
@@ -905,7 +939,7 @@ func _process(delta: float) -> void:
 	if input != Vector2.ZERO or _player_kb.length() > 1.0 or _punch_active \
 			or not _monsters.is_empty() or not _poofs.is_empty() or _spark_t < 1.0 or _shake > 0.0 \
 			or not _projectiles.is_empty() or not _poison_clouds.is_empty() \
-			or not _ground_items.is_empty() or not _fish.is_empty() or not _peels.is_empty() \
+			or not _ground_items.is_empty() or not _dmg_texts.is_empty() or not _fish.is_empty() or not _peels.is_empty() \
 			or _burn_t > 0.0 or _freeze_t > 0.0 or _slow_t > 0.0:
 		queue_redraw()
 
@@ -971,8 +1005,20 @@ func _apply_daylight() -> void:
 		_canvas_mod.color = NIGHT_COLOR.lerp(Color.WHITE, _daylight(_time))
 
 
+# Some trees and rocks survive the nightly clearing, giving you and the crocs
+# terrain to duck behind (stable per cell, reshuffled each night).
+func _night_cover(i: int, t: int) -> bool:
+	if t != Terrain.TREE and t != Terrain.STONE:
+		return false
+	var c := _index_cell(i)
+	if _chebyshev(c, _cell) <= 2:
+		return false   # never box the player in at the moment night falls
+	return (_cell_hash(c.x, c.y + _day * 7) % 100) < COVER_PCT
+
+
 func _begin_night() -> void:
 	_is_night = true
+	_play_sfx("night", 0.8, 0.0)
 	_flow_dirty = true   # new raid: rebuild paths against the latest base layout
 	# No building at night: force-exit build mode.
 	_build_mode = false
@@ -983,6 +1029,8 @@ func _begin_night() -> void:
 	for i in range(_terrain.size()):
 		var t: int = _terrain[i]
 		if NATURAL.has(t):
+			if _night_cover(i, t):
+				continue   # this one stays up as cover
 			_night_snapshot[i] = {"t": t, "banana": _banana[i], "berry": _berry[i]}
 			_terrain[i] = Terrain.GRASS
 			_banana[i] = 0
@@ -1000,6 +1048,7 @@ func _begin_night() -> void:
 
 func _begin_day() -> void:
 	_is_night = false
+	_play_sfx("dawn", 0.8, 0.0)
 	for idx in _night_snapshot:
 		if _terrain[idx] != Terrain.GRASS:
 			continue  # player built here during the night -- keep their structure
@@ -1027,6 +1076,7 @@ func _begin_day() -> void:
 			_turrets[ti]["field"] = Vector2.INF
 	_punch_active = false
 	_player_kb = Vector2.ZERO
+	_invuln_t = 0.0
 	_refresh_context_panel()
 	queue_redraw()
 
@@ -1052,7 +1102,7 @@ func _world_tick(delta: float) -> void:
 					changed = true
 			Terrain.SAPLING:
 				_growth[i] += BANANA_TICK
-				if _growth[i] >= SAPLING_TIME and i != player_idx:
+				if _growth[i] >= SAPLING_TIME and i != player_idx and not _cell_overlaps_player(_index_cell(i)):
 					_terrain[i] = Terrain.TREE
 					_growth[i] = 0.0
 					changed = true
@@ -1068,7 +1118,7 @@ func _world_tick(delta: float) -> void:
 # Monsters
 # -----------------------------------------------------------------------------
 func _monster_count_for_day() -> int:
-	return mini(MONSTER_CAP, MONSTER_BASE + (_night_index() - 1) * MONSTER_PER_DAY)
+	return mini(MONSTER_CAP, MONSTER_BASE + int((_night_index() - 1) * MONSTER_PER_DAY))
 
 
 # Build a crocodile of `type` with stats scaled to night `n` (n = 1 on night one).
@@ -1119,8 +1169,11 @@ func _spawn_monsters(n: int) -> void:
 	var shore := _pool_shore.duplicate()
 	shore.shuffle()
 	var placed := 0
+	var shore_n := n
+	if night >= FLANK_NIGHT:
+		shore_n = n - int(round(n * FLANK_FRAC))   # the rest wade in from the map edges
 	for c in shore:
-		if placed >= n:
+		if placed >= shore_n:
 			break
 		if not MONSTER_WALK.has(_terrain_at(c)):
 			continue
@@ -1128,11 +1181,20 @@ func _spawn_monsters(n: int) -> void:
 		_monsters.append(_croc_for_night(_cell_center_world(c), night, type))
 		_poofs.append({"pos": _cell_center_world(c), "t": 0.2})  # a splash as it surfaces
 		placed += 1
-	# If the pool can't seat them all, the rest wade in from random far ground.
+	# Flankers (later nights) and any the pool can't seat wade in from far ground.
 	var attempts := 0
 	while placed < n and attempts < 3000:
 		attempts += 1
 		var c := Vector2i(randi() % GRID_CELLS, randi() % GRID_CELLS)
+		if night >= FLANK_NIGHT and attempts < 1500:
+			# Push the roll onto the border band so raids come from several sides.
+			var side := randi() % 4
+			var d := randi() % EDGE_BAND
+			match side:
+				0: c.x = d
+				1: c.x = GRID_CELLS - 1 - d
+				2: c.y = d
+				_: c.y = GRID_CELLS - 1 - d
 		if not MONSTER_WALK.has(_terrain_at(c)) or _chebyshev(c, _cell) < SPAWN_MIN_DIST:
 			continue
 		var type: String = pool[randi() % pool.size()]
@@ -1186,7 +1248,7 @@ func _regrow_world() -> void:
 		while attempts < 60:
 			attempts += 1
 			var c := Vector2i(randi() % GRID_CELLS, randi() % GRID_CELLS)
-			if _terrain_at(c) != Terrain.GRASS or c == _cell:
+			if _terrain_at(c) != Terrain.GRASS or c == _cell or _cell_overlaps_player(c):
 				continue
 			if _near_structure(c, REGROW_STRUCT_BUFFER):
 				continue
@@ -1289,6 +1351,8 @@ func _monster_update(delta: float) -> void:
 			continue
 		_move_monster_toward(m, dir, delta, m["speed"])
 
+	_separate_monsters(delta)
+
 	# Remove dead -- but keep black crocs still owing a revive (no XP on first kill).
 	var alive := []
 	for m in _monsters:
@@ -1303,6 +1367,30 @@ func _monster_update(delta: float) -> void:
 			_poofs.append({"pos": m["pos"], "t": 0.0})
 			_add_shake(2.0)
 	_monsters = alive
+
+
+# Soft collision between crocs so a horde reads as a horde instead of one stacked
+# sprite. Burrowed diggers and downed crocs are ignored; pushes respect walls.
+func _separate_monsters(delta: float) -> void:
+	var min_d := MONSTER_RADIUS * 2.0 * CROC_SEPARATION
+	var max_push := CROC_PUSH_SPEED * delta
+	var n := _monsters.size()
+	for i in range(n):
+		var a: Dictionary = _monsters[i]
+		if a["hp"] <= 0.0 or a["dig"]:
+			continue
+		for j in range(i + 1, n):
+			var b: Dictionary = _monsters[j]
+			if b["hp"] <= 0.0 or b["dig"]:
+				continue
+			var d: Vector2 = b["pos"] - a["pos"]
+			var dl := d.length()
+			if dl >= min_d:
+				continue
+			var dir: Vector2 = d / dl if dl > 0.01 else Vector2.from_angle(float((i * 7 + j * 13) % 360) * 0.0174533)
+			var push := minf((min_d - dl) * 0.5, max_push)
+			a["pos"] = _move_collide(a["pos"], -dir * push, MONSTER_RADIUS, MONSTER_WALK)
+			b["pos"] = _move_collide(b["pos"], dir * push, MONSTER_RADIUS, MONSTER_WALK)
 
 
 # Count down the assist/debuff credit timers, dropping any that have lapsed so
@@ -1538,6 +1626,17 @@ func _update_poison_clouds(delta: float) -> void:
 	_poison_clouds = keep
 
 
+# True if any living croc's body (circle) touches cell `c`, not just its centre.
+func _monster_overlaps_cell(c: Vector2i) -> bool:
+	var r := Rect2(Vector2(c) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE))
+	for m in _monsters:
+		var p: Vector2 = m["pos"]
+		var q := Vector2(clampf(p.x, r.position.x, r.end.x), clampf(p.y, r.position.y, r.end.y))
+		if p.distance_to(q) < MONSTER_RADIUS:
+			return true
+	return false
+
+
 func _monster_at(c: Vector2i) -> int:
 	for i in range(_monsters.size()):
 		if _world_to_cell(_monsters[i]["pos"]) == c:
@@ -1587,6 +1686,11 @@ func _turret_take_damage(t: Dictionary, dmg: float) -> void:
 
 
 func _damage_player(dmg: float, from_pos: Vector2 = Vector2.INF) -> void:
+	if _invuln_t > 0.0:
+		return   # still recovering from the last hit
+	_invuln_t = HURT_INVULN
+	_add_dmg_text(_player_pos, dmg * (1.0 - _p_armor), Color(1.0, 0.45, 0.40))
+	_play_sfx("hurt", 1.0, 0.04)
 	_health = maxf(0.0, _health - dmg * (1.0 - _p_armor))  # armor reduces incoming damage
 	_hurt_flash = FLASH_TIME * 1.6
 	_add_shake(9.0)
@@ -1691,6 +1795,7 @@ func _fire_projectile(from: Vector2, kind: String) -> void:
 	var dir := (_player_pos - from)
 	dir = dir.normalized() if dir.length() > 1.0 else Vector2.RIGHT
 	_projectiles.append({"pos": from, "vel": dir * PROJ_SPEED, "kind": kind})
+	_play_sfx("spit", 0.5)
 
 
 func _update_projectiles(delta: float) -> void:
@@ -1912,6 +2017,7 @@ func _turret_ranged(t: Dictionary, _delta: float) -> void:
 			proj["aoefrac"] = float(def.get("aoefrac", 0.4))
 			proj["slow"] = float(def.get("slow", 1.0))
 	_projectiles.append(proj)
+	_play_sfx("shoot", 0.45)
 	t["cd"] = _turret_stat(t, "cd")
 	_turret_spend_fuel(t)
 
@@ -2130,7 +2236,9 @@ func _update_trickster_marks(delta: float) -> void:
 # and records who gets the kill (a turret cell idx, or "player").
 func _hurt_croc(m: Dictionary, dmg: float, kb_vec: Vector2, kb_mult: float, killer) -> void:
 	var mult := 1.2 if m["marked"] else 1.0
-	m["hp"] = float(m["hp"]) - dmg * (1.0 - float(m["armor"])) * mult
+	var dealt: float = dmg * (1.0 - float(m["armor"])) * mult
+	m["hp"] = float(m["hp"]) - dealt
+	_add_dmg_text(m["pos"], dealt, Color(1.0, 0.95, 0.6))
 	m["flash"] = FLASH_TIME
 	if kb_mult > 0.0:
 		var d := kb_vec.normalized() if kb_vec.length() > 0.01 else Vector2.RIGHT
@@ -2143,6 +2251,9 @@ func _hurt_croc(m: Dictionary, dmg: float, kb_vec: Vector2, kb_mult: float, kill
 		log[killer] = TURRET_ASSIST_WINDOW
 	if float(m["hp"]) <= 0.0:
 		m["killer"] = killer
+		_play_sfx("croc_die", 0.9)
+	else:
+		_play_sfx("hit", 0.8)
 
 
 func _rocket_splash(center: Vector2, dmg: float, radius: float, slow: float, owner, exclude) -> void:
@@ -2316,13 +2427,18 @@ func _load_progress() -> void:
 	f.close()
 	if data is Dictionary and (data as Dictionary).has("best_nights"):
 		_best_nights = int((data as Dictionary)["best_nights"])
+	if data is Dictionary:
+		var d := data as Dictionary
+		_sfx_vol = clampf(float(d.get("sfx_vol", _sfx_vol)), 0.0, 1.0)
+		_music_vol = clampf(float(d.get("music_vol", _music_vol)), 0.0, 1.0)
+		_muted = bool(d.get("muted", false))
 
 
 func _save_progress() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		return
-	f.store_var({"best_nights": _best_nights})
+	f.store_var({"best_nights": _best_nights, "sfx_vol": _sfx_vol, "music_vol": _music_vol, "muted": _muted})
 	f.close()
 
 
@@ -2365,6 +2481,7 @@ func _gain_xp(amount: int) -> void:
 
 func _level_up() -> void:
 	_level += 1
+	_play_sfx("levelup", 0.9, 0.0)
 	_xp_to_next = _xp_needed(_level)
 	# Grant a point and freeze the action until the player chooses where it goes.
 	_stat_points += 1
@@ -2437,7 +2554,8 @@ func _respawn_after_death() -> void:
 	_clear_status_effects()
 	_projectiles.clear()
 	_poison_clouds.clear()
-	_cell = Vector2i(GRID_CELLS / 2, GRID_CELLS / 2)
+	_invuln_t = 0.0
+	_cell = _nearest_walkable_cell(Vector2i(GRID_CELLS / 2, GRID_CELLS / 2))   # never inside a wall
 	_player_pos = _cell_center_world(_cell)
 	_camera.position = _player_pos
 	_time = 0.30
@@ -2462,6 +2580,7 @@ func _reset_game() -> void:
 	_weapon_equipped = ""
 	_gear_armor = 0.0
 	_lives = MAX_LIVES
+	_invuln_t = 0.0
 	_time = 0.30
 	_day = 1
 	_banana_timer = 0.0
@@ -2525,6 +2644,9 @@ func _input(event: InputEvent) -> void:
 		if kc == KEY_B:
 			# B toggles the Build tab (build mode is daytime-only).
 			_select_tab("help" if _build_mode else "build")
+		elif kc == KEY_M:
+			_set_muted(not _muted)
+			_set_msg("Sound off (M to turn on)" if _muted else "Sound on")
 		elif kc == KEY_E:
 			_try_eat()
 		elif kc == KEY_Q:
@@ -2593,6 +2715,9 @@ func _apply_build_at(c: Vector2i) -> void:
 		var s: Dictionary = STRUCTURES[_build_struct]
 		if c == _cell or _monster_at(c) != -1:
 			return
+		if not WALKABLE.has(int(s["terrain"])) and _monster_overlaps_cell(c):
+			_set_msg("A croc is in the way.")
+			return
 		if _terrain_at(c) != Terrain.GRASS:
 			return
 		# Don't let the player wall themselves into a tile: refuse a solid block
@@ -2623,6 +2748,7 @@ func _apply_build_at(c: Vector2i) -> void:
 			return
 		_spend(s["cost"])
 		_set_terrain(c, s["terrain"])
+		_play_sfx("build", 0.8)
 		var bidx := _cell_index(c)
 		match int(s["terrain"]):
 			Terrain.STORAGE:
@@ -2780,12 +2906,192 @@ func _refund(cost: Dictionary) -> void:
 
 
 # -----------------------------------------------------------------------------
+# Audio: procedurally synthesised sfx + two ambient music loops
+# -----------------------------------------------------------------------------
+# Render a sound to a 16-bit mono AudioStreamWAV. `wave`: 0 sine, 1 square, 2 saw,
+# 3 triangle. Pitch glides f0 -> f1; `noise` mixes in white noise; `decay` shapes
+# the envelope (higher = punchier).
+func _synth_tone(dur: float, f0: float, f1: float, wave: int, noise: float, decay: float, gain: float = 0.6) -> PackedFloat32Array:
+	var n := int(dur * SFX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase := 0.0
+	var lp := 0.0
+	for i in range(n):
+		var t := float(i) / float(n)
+		phase += lerpf(f0, f1, t) / float(SFX_RATE)
+		var ph := phase - floorf(phase)
+		var v := 0.0
+		match wave:
+			0: v = sin(ph * TAU)
+			1: v = 1.0 if ph < 0.5 else -1.0
+			2: v = ph * 2.0 - 1.0
+			_: v = absf(ph * 4.0 - 2.0) - 1.0
+		if noise > 0.0:
+			lp += (randf_range(-1.0, 1.0) - lp) * 0.35   # softened noise
+			v = v * (1.0 - noise) + lp * noise * 1.6
+		var env := pow(1.0 - t, decay) * minf(1.0, float(i) / (0.004 * SFX_RATE))
+		out[i] = v * env * gain
+	return out
+
+
+func _synth_notes(notes: Array, note_dur: float, wave: int, gain: float = 0.45) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	for f in notes:
+		out.append_array(_synth_tone(note_dur, float(f), float(f), wave, 0.0, 1.6, gain))
+	return out
+
+
+func _to_wav(data: PackedFloat32Array, rate: int, loop: bool = false) -> AudioStreamWAV:
+	var bytes := PackedByteArray()
+	bytes.resize(data.size() * 2)
+	for i in range(data.size()):
+		bytes.encode_s16(i * 2, int(clampf(data[i], -1.0, 1.0) * 32000.0))
+	var w := AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_16_BITS
+	w.mix_rate = rate
+	w.stereo = false
+	w.data = bytes
+	if loop:
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		w.loop_begin = 0
+		w.loop_end = data.size()
+	return w
+
+
+func _build_sfx() -> void:
+	_sfx["punch"] = _to_wav(_synth_tone(0.13, 420.0, 140.0, 0, 0.7, 2.2, 0.5), SFX_RATE)
+	_sfx["hit"] = _to_wav(_synth_tone(0.16, 200.0, 70.0, 3, 0.35, 2.0, 0.7), SFX_RATE)
+	_sfx["croc_die"] = _to_wav(_synth_tone(0.4, 240.0, 55.0, 2, 0.25, 1.4, 0.5), SFX_RATE)
+	_sfx["hurt"] = _to_wav(_synth_tone(0.26, 150.0, 80.0, 1, 0.4, 1.8, 0.5), SFX_RATE)
+	_sfx["build"] = _to_wav(_synth_tone(0.11, 210.0, 110.0, 3, 0.3, 2.5, 0.7), SFX_RATE)
+	_sfx["harvest"] = _to_wav(_synth_tone(0.09, 320.0, 200.0, 0, 0.85, 3.0, 0.5), SFX_RATE)
+	_sfx["shoot"] = _to_wav(_synth_tone(0.12, 900.0, 300.0, 0, 0.1, 2.0, 0.35), SFX_RATE)
+	_sfx["spit"] = _to_wav(_synth_tone(0.22, 420.0, 180.0, 1, 0.5, 1.6, 0.3), SFX_RATE)
+	_sfx["night"] = _to_wav(_synth_tone(1.5, 110.0, 68.0, 2, 0.1, 0.6, 0.5), SFX_RATE)
+	_sfx["dawn"] = _to_wav(_synth_notes([523.25, 659.25, 783.99, 1046.5], 0.22, 0, 0.45), SFX_RATE)
+	_sfx["levelup"] = _to_wav(_synth_notes([392.0, 523.25, 659.25, 784.0, 1046.5], 0.11, 3, 0.5), SFX_RATE)
+
+
+# One ambient loop: "day" = airy pentatonic plucks over a soft pad, "night" = low
+# drone with sparse cold notes. Frequencies are snapped so the loop is seamless.
+func _synth_music(kind: String) -> AudioStreamWAV:
+	var n := int(MUSIC_LEN * MUSIC_RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var snap := func(f: float) -> float: return roundf(f * MUSIC_LEN) / MUSIC_LEN
+	var pad: Array = []
+	var plucks: Array = []
+	var step := 0.5
+	if kind == "day":
+		pad = [snap.call(130.81), snap.call(196.0), snap.call(261.63)]
+		plucks = [523.25, 587.33, 659.25, 783.99, 880.0]
+	else:
+		pad = [snap.call(55.0), snap.call(82.41), snap.call(110.0)]
+		plucks = [220.0, 246.94, 329.63]
+		step = 2.0
+	var count := int(MUSIC_LEN / step)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242 if kind == "day" else 1717
+	var seq: Array = []
+	for _i in range(count):
+		seq.append(-1 if rng.randf() < (0.45 if kind == "day" else 0.4) else rng.randi() % plucks.size())
+	for i in range(n):
+		var t := float(i) / float(MUSIC_RATE)
+		var v := 0.0
+		var lfo := 0.6 + 0.4 * sin(TAU * t / MUSIC_LEN * 2.0)
+		for f in pad:
+			v += sin(TAU * float(f) * t) * (0.10 if kind == "day" else 0.16) * lfo
+		var slot := int(t / step) % count
+		var idx: int = seq[slot]
+		if idx >= 0:
+			var lt := fmod(t, step)
+			var env := exp(-lt * (5.0 if kind == "day" else 1.6)) * minf(1.0, lt * 200.0)
+			var pf: float = plucks[idx]
+			v += sin(TAU * pf * t) * env * (0.16 if kind == "day" else 0.09)
+		out[i] = v
+	return _to_wav(out, MUSIC_RATE, true)
+
+
+func _audio_init() -> void:
+	_build_sfx()
+	for _i in range(SFX_VOICES):
+		var pl := AudioStreamPlayer.new()
+		add_child(pl)
+		_sfx_players.append(pl)
+	_music_player = AudioStreamPlayer.new()
+	add_child(_music_player)
+	_music_thread = Thread.new()
+	_music_thread.start(_music_worker)   # loops take a moment to render; keep it off the main thread
+	_apply_volumes()
+
+
+func _music_worker() -> void:
+	_music["day"] = _synth_music("day")
+	_music["night"] = _synth_music("night")
+
+
+func _apply_volumes() -> void:
+	AudioServer.set_bus_mute(0, _muted)
+
+
+func _play_sfx(name: String, vol: float = 1.0, pitch_jitter: float = 0.08) -> void:
+	if _sfx_players.is_empty() or _muted or not _sfx.has(name):
+		return
+	var now := Time.get_ticks_msec()
+	if now - int(_sfx_last.get(name, -1000)) < 45:
+		return   # a swarm of turrets shouldn't machine-gun the same sample
+	_sfx_last[name] = now
+	var pl: AudioStreamPlayer = _sfx_players[_sfx_next]
+	_sfx_next = (_sfx_next + 1) % _sfx_players.size()
+	pl.stream = _sfx[name]
+	pl.volume_db = linear_to_db(maxf(0.0001, _sfx_vol * vol))
+	pl.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter)
+	pl.play()
+
+
+# Cross-fade between the day and night loops (and follow the volume slider).
+func _update_music(delta: float) -> void:
+	if _music_player == null:
+		return
+	if _music_thread != null and _music_thread.is_started() and not _music_thread.is_alive():
+		_music_thread.wait_to_finish()
+	_music_want = "night" if (_is_night and _app_state == AppState.PLAYING) else "day"
+	if not _music.has(_music_want):
+		return
+	if _music_cur != _music_want:
+		_music_gain = maxf(0.0, _music_gain - delta * 2.0)
+		if _music_gain <= 0.0:
+			_music_cur = _music_want
+			_music_player.stream = _music[_music_cur]
+			_music_player.play()
+	else:
+		_music_gain = minf(1.0, _music_gain + delta * 1.0)
+	_music_player.volume_db = linear_to_db(maxf(0.0001, _music_vol * _music_gain * 0.6))
+
+
+func _on_volume_changed(v: float, var_name: String) -> void:
+	set(var_name, v)
+	if var_name == "_sfx_vol":
+		_play_sfx("hit", 1.0)
+	_save_progress()
+
+
+func _set_muted(m: bool) -> void:
+	_muted = m
+	_apply_volumes()
+	_save_progress()
+
+
+# -----------------------------------------------------------------------------
 # Movement / interact / harvest / eat
 # -----------------------------------------------------------------------------
 # Move a circle (radius hs) by `motion`, resolved per-axis so it slides along
 # blocking tiles. `walkset` is the set of terrains this body may stand on.
 func _move_collide(pos: Vector2, motion: Vector2, hs: float, walkset: Dictionary) -> Vector2:
 	var p := pos
+	if _box_blocked(p, hs, walkset):
+		p = _depenetrate(p, hs, walkset)   # wedged in a solid tile: pop out first
 	var nx := Vector2(p.x + motion.x, p.y)
 	if not _box_blocked(nx, hs, walkset):
 		p = nx
@@ -2793,6 +3099,33 @@ func _move_collide(pos: Vector2, motion: Vector2, hs: float, walkset: Dictionary
 	if not _box_blocked(ny, hs, walkset):
 		p = ny
 	return p
+
+
+# Nearest free spot to `pos` for a body already overlapping a solid tile (found by
+# sampling widening rings). Returns `pos` unchanged if nothing free is nearby.
+func _depenetrate(pos: Vector2, hs: float, walkset: Dictionary) -> Vector2:
+	var r := 2.0
+	while r <= CELL_SIZE * 3.0:
+		for k in range(16):
+			var ang := TAU * float(k) / 16.0
+			var cand := pos + Vector2(cos(ang), sin(ang)) * r
+			if not _box_blocked(cand, hs, walkset):
+				return cand
+		r += 2.0
+	return pos
+
+
+# Nearest cell to `from` that the player can stand on (spiral search by ring).
+func _nearest_walkable_cell(from: Vector2i) -> Vector2i:
+	for ring in range(GRID_CELLS):
+		for oy in range(-ring, ring + 1):
+			for ox in range(-ring, ring + 1):
+				if maxi(absi(ox), absi(oy)) != ring:
+					continue
+				var c := from + Vector2i(ox, oy)
+				if _in_bounds(c) and WALKABLE.has(_terrain_at(c)) and _monster_at(c) == -1:
+					return c
+	return from
 
 
 func _box_blocked(center: Vector2, hs: float, walkset: Dictionary) -> bool:
@@ -3014,6 +3347,7 @@ func _fire_slingshot(aim_world: Vector2) -> void:
 		"pos": _player_pos + dir * PLAYER_RADIUS, "vel": dir * SLING_PROJ_SPEED,
 		"kind": "sling", "owner": "player", "dmg": dmg, "kb": float(WEAPON_DEFS["slingshot"]["kb"]),
 	})
+	_play_sfx("shoot", 0.7)
 
 
 # Spoiled matter, treated uniformly (any rotten fruit) for glue/compost recipes.
@@ -3047,6 +3381,7 @@ func _consume_fish(n: int) -> void:
 
 
 func _harvest_cell(c: Vector2i) -> void:
+	_play_sfx("harvest", 0.7)
 	var t := _terrain_at(c)
 	var idx := _cell_index(c)
 	if t == Terrain.TREE:
@@ -3102,6 +3437,7 @@ func _start_punch(aim_world: Vector2) -> void:
 	_punch_active = true
 	_punch_t = 0.0
 	_punch_hit = false
+	_play_sfx("punch", 0.8)
 
 
 # Extension 0..1: rises during the first half (extend), falls in the second (retract).
@@ -3312,6 +3648,9 @@ func _update_juice(delta: float) -> void:
 		_camera.position += Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake
 
 	_hurt_flash = maxf(0.0, _hurt_flash - delta)
+	for dt in _dmg_texts:
+		dt["t"] = float(dt["t"]) + delta
+	_dmg_texts = _dmg_texts.filter(func(d): return float(d["t"]) < 0.8)
 	if _spark_t < 1.0:
 		_spark_t = minf(1.0, _spark_t + delta / SPARK_TIME)
 
@@ -4600,6 +4939,20 @@ func _build_menu_layer() -> void:
 	fb.pressed.connect(_set_fullscreen)
 	sizes_row.add_child(fb)
 	sbox.add_child(sizes_row)
+	sbox.add_child(_spacer(14))
+	sbox.add_child(_settings_label("AUDIO  (M mutes)", 22, UI_ACCENT))
+	for row_def in [["Sound effects", "_sfx_vol"], ["Music", "_music_vol"]]:
+		var arow := HBoxContainer.new()
+		arow.alignment = BoxContainer.ALIGNMENT_CENTER
+		arow.add_theme_constant_override("separation", 10)
+		arow.add_child(_settings_label(row_def[0], 16, Color(0.9, 0.92, 0.95)))
+		var sl := HSlider.new()
+		sl.min_value = 0.0; sl.max_value = 1.0; sl.step = 0.05
+		sl.custom_minimum_size = Vector2(220, 24)
+		sl.value = float(get(row_def[1]))
+		sl.value_changed.connect(_on_volume_changed.bind(row_def[1]))
+		arow.add_child(sl)
+		sbox.add_child(arow)
 	sbox.add_child(_spacer(18))
 	sbox.add_child(_menu_button("Back", _close_settings))
 	_menu_layer.add_child(_settings_root)
@@ -5354,8 +5707,8 @@ func _build_help_panel() -> void:
 		_right_vbox.add_child(_label("Storage still works."))
 	else:
 		_right_vbox.add_child(_label("Gather and build by day."))
-		_right_vbox.add_child(_label("At night the land clears and"))
-		_right_vbox.add_child(_label("crocodiles hunt you -- wall"))
+		_right_vbox.add_child(_label("At night most of the land clears and"))
+		_right_vbox.add_child(_label("crocs hunt you -- wall"))
 		_right_vbox.add_child(_label("yourself in behind a door."))
 		_right_vbox.add_child(_label("Build turrets + spike traps to"))
 		_right_vbox.add_child(_label("let the base fight for you."))
@@ -5451,13 +5804,87 @@ func _cost_text(cost: Dictionary) -> String:
 # -----------------------------------------------------------------------------
 # Drawing (board only -- gameplay visual cues, no text)
 # -----------------------------------------------------------------------------
+# Stable per-cell pseudo-random number (drives grass variants and tint).
+func _cell_hash(x: int, y: int) -> int:
+	var h := (x * 73856093) ^ (y * 19349663) ^ 0x5bd1e995
+	h = (h ^ (h >> 13)) * 1274126177
+	return absi(h ^ (h >> 16))
+
+
+# Flat oval drop shadow under a character; the caller passes its feet position.
+func _draw_shadow(p: Vector2, r: float, a: float = 0.28) -> void:
+	draw_set_transform(p, 0.0, Vector2(1.0, 0.42))
+	draw_circle(Vector2.ZERO, r, Color(0, 0, 0, a))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+# A recognisable little icon per loot kind (falls back to a tinted gem).
+func _draw_loot_icon(kind: String, p: Vector2, col: Color, t: float) -> void:
+	draw_set_transform(p + Vector2(1, 6), 0.0, Vector2(1.0, 0.4))
+	draw_circle(Vector2.ZERO, CELL_SIZE * 0.17, Color(0, 0, 0, 0.30))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var u := CELL_SIZE / 32.0
+	match kind:
+		"bone":
+			draw_line(p + Vector2(-5, 3) * u, p + Vector2(5, -3) * u, col, 2.5 * u)
+			for e in [Vector2(-6, 2), Vector2(-4, 5), Vector2(6, -2), Vector2(4, -5)]:
+				draw_circle(p + e * u, 2.0 * u, col)
+		"croc_hide":
+			draw_colored_polygon(PackedVector2Array([p + Vector2(-7, -3) * u, p + Vector2(-2, -6) * u, p + Vector2(5, -5) * u,
+				p + Vector2(7, 1) * u, p + Vector2(2, 6) * u, p + Vector2(-5, 5) * u]), col)
+			draw_line(p + Vector2(-4, -1) * u, p + Vector2(4, 1) * u, col.darkened(0.35), 1.5 * u)
+		"wood":
+			draw_line(p + Vector2(-6, 3) * u, p + Vector2(6, -3) * u, col, 4.0 * u)
+			draw_line(p + Vector2(-6, 3) * u, p + Vector2(6, -3) * u, col.lightened(0.25), 1.5 * u)
+		"stone":
+			draw_colored_polygon(PackedVector2Array([p + Vector2(-6, 3) * u, p + Vector2(-3, -5) * u, p + Vector2(4, -4) * u, p + Vector2(7, 3) * u]), col)
+			draw_line(p + Vector2(-3, -5) * u, p + Vector2(4, -4) * u, col.lightened(0.3), 1.5 * u)
+		"glapple":
+			draw_texture_rect(_tex_glow, Rect2(p - Vector2(14, 14) * u, Vector2(28, 28) * u), false, Color(0.4, 0.7, 1.0, 0.55 + 0.25 * sin(t * 5.0)))
+			draw_circle(p, 4.5 * u, col)
+			draw_circle(p + Vector2(-1.5, -1.5) * u, 1.5 * u, Color(1, 1, 1, 0.9))
+		"worm":
+			var prev := p + Vector2(-6, 0) * u
+			for k in range(1, 7):
+				var nxt := p + Vector2(-6 + k * 2.0, sin(t * 6.0 + k) * 2.5) * u
+				draw_line(prev, nxt, col, 2.5 * u)
+				prev = nxt
+		"bee":
+			var wob := Vector2(sin(t * 9.0) * 2.0, cos(t * 7.0) * 1.5) * u
+			draw_circle(p + wob + Vector2(-2, -3) * u, 2.5 * u, Color(0.85, 0.92, 1.0, 0.7))
+			draw_circle(p + wob + Vector2(2, -3) * u, 2.5 * u, Color(0.85, 0.92, 1.0, 0.7))
+			draw_circle(p + wob, 3.5 * u, col)
+			draw_line(p + wob + Vector2(-1, -3) * u, p + wob + Vector2(-1, 3) * u, Color(0.15, 0.12, 0.05), 1.2 * u)
+			draw_line(p + wob + Vector2(1.5, -3) * u, p + wob + Vector2(1.5, 3) * u, Color(0.15, 0.12, 0.05), 1.2 * u)
+		_:
+			draw_circle(p, CELL_SIZE * 0.16, col)
+			draw_arc(p, CELL_SIZE * 0.16, 0.0, TAU, 12, Color(1, 1, 1, 0.6), 1.0)
+
+
+func _add_dmg_text(pos: Vector2, amount: float, col: Color) -> void:
+	_dmg_texts.append({"pos": pos + Vector2(randf_range(-6.0, 6.0), -CELL_SIZE * 0.4), "text": str(maxi(1, int(round(amount)))), "t": 0.0, "col": col})
+	if _dmg_texts.size() > 40:
+		_dmg_texts.pop_front()
+
+
 func _draw() -> void:
 	var cell_vec := Vector2(CELL_SIZE, CELL_SIZE)
 	for y in range(GRID_CELLS):
 		for x in range(GRID_CELLS):
 			var idx := y * GRID_CELLS + x
 			var pos := Vector2(x, y) * CELL_SIZE
-			draw_texture_rect(_tiles[_terrain[idx]], Rect2(pos, cell_vec), false)
+			if _terrain[idx] == Terrain.GRASS and not _grass_var.is_empty():
+				var gh := _cell_hash(x, y)
+				var gvi := 0
+				var gsel := gh % 100
+				if gsel >= 88: gvi = 5       # pebble
+				elif gsel >= 82: gvi = 4     # flower
+				elif gsel >= 66: gvi = 3     # tuft
+				else: gvi = gsel % 3         # plain
+				var tint := 0.975 + float((gh >> 8) % 6) * 0.01
+				draw_texture_rect(_grass_var[gvi], Rect2(pos, cell_vec), false, Color(tint, tint, tint))
+			else:
+				draw_texture_rect(_tiles[_terrain[idx]], Rect2(pos, cell_vec), false)
 			if _terrain[idx] == Terrain.TREE and _banana[idx] == 1:
 				draw_texture_rect(_tex_banana, Rect2(pos, cell_vec), false)
 			elif _terrain[idx] == Terrain.COCONUT and _banana[idx] == 1:
@@ -5471,6 +5898,24 @@ func _draw() -> void:
 				var frac := 1.0 - float(_struct_hp[idx]) / float(BREAK_HP.get(_terrain[idx], 1))
 				draw_rect(Rect2(pos, cell_vec), Color(0.0, 0.0, 0.0, 0.55 * frac), true)
 
+	# Grounding: tall things cast a soft shadow onto the tile below them, and solid
+	# blocks get a dark lip along their lower edge.
+	for y in range(GRID_CELLS - 1):
+		for x in range(GRID_CELLS):
+			var sidx := y * GRID_CELLS + x
+			var st: int = _terrain[sidx]
+			var below: int = _terrain[sidx + GRID_CELLS]
+			if below != Terrain.GRASS and below != Terrain.FLOOR and below != Terrain.SAND:
+				continue
+			var bp := Vector2(x, y + 1) * CELL_SIZE
+			if st == Terrain.TREE or st == Terrain.COCONUT or st == Terrain.STONE or st == Terrain.BUSH:
+				draw_set_transform(bp + Vector2(CELL_SIZE * 0.55, 0.0), 0.0, Vector2(1.0, 0.35))
+				draw_circle(Vector2.ZERO, CELL_SIZE * 0.42, Color(0, 0, 0, 0.20))
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			elif st == Terrain.WOOD_WALL or st == Terrain.STONE_WALL or st == Terrain.WORKBENCH or st == Terrain.STORAGE:
+				draw_rect(Rect2(bp, Vector2(CELL_SIZE, 4.0)), Color(0, 0, 0, 0.22))
+				draw_rect(Rect2(bp + Vector2(0, 4.0), Vector2(CELL_SIZE, 3.0)), Color(0, 0, 0, 0.10))
+
 	# Light sources cast a soft glow when it's dark (glapple lamps for now).
 	var dl := _daylight(_time)
 	if dl < 0.55:
@@ -5479,9 +5924,7 @@ func _draw() -> void:
 			var lp: Vector2 = ls["pos"]
 			var lr: float = ls["radius"]
 			var lc: Color = ls["color"]
-			for ri in range(5):
-				var rr := lr * (1.0 - float(ri) / 5.0)
-				draw_circle(lp, rr, Color(lc.r, lc.g, lc.b, 0.12 * night_amt))
+			draw_texture_rect(_tex_glow, Rect2(lp - Vector2(lr, lr), Vector2(lr, lr) * 2.0), false, Color(lc.r, lc.g, lc.b, 0.55 * night_amt))
 
 	var side := float(GRID_CELLS) * CELL_SIZE
 	for i in range(GRID_CELLS + 1):
@@ -5525,12 +5968,20 @@ func _draw() -> void:
 		# Dead-but-reviving black croc: greyed, lying in place.
 		var reviving: bool = m["hp"] <= 0.0 and m["role"] == "reviver" and not m["revived"]
 		var left: bool = (_player_pos.x - mp.x) < 0
-		var rect := Rect2(mp - cell_vec * 0.5, cell_vec)
+		var rect := Rect2(mp - cell_vec * 0.68, cell_vec * 1.36)   # crocs read bigger than one tile
+		_draw_shadow(mp + Vector2(0, CELL_SIZE * 0.22), CELL_SIZE * 0.46)
 		draw_texture_rect(tex["l"] if left else tex["r"], rect, false,
 			Color(0.5, 0.5, 0.55) if reviving else Color.WHITE)
 		if m["flash"] > 0.0:
 			var fa: float = clampf(m["flash"] / FLASH_TIME, 0.0, 1.0)
 			draw_texture_rect(tex["fl"] if left else tex["fr"], rect, false, Color(1, 1, 1, fa))
+		# Health bar once a croc has taken damage.
+		if m["hp"] > 0.0 and m["hp"] < m["max_hp"]:
+			var hbw := CELL_SIZE * 0.7
+			var hbp := mp + Vector2(-hbw * 0.5, -CELL_SIZE * 0.52)
+			var hfrac := clampf(float(m["hp"]) / float(m["max_hp"]), 0.0, 1.0)
+			draw_rect(Rect2(hbp - Vector2(1, 1), Vector2(hbw + 2, 5)), Color(0, 0, 0, 0.65))
+			draw_rect(Rect2(hbp, Vector2(hbw * hfrac, 3)), Color(0.35, 0.85, 0.35).lerp(Color(0.9, 0.25, 0.2), 1.0 - hfrac))
 
 	# Green "+" over crocs currently being mended by a white croc.
 	for m in _monsters:
@@ -5599,9 +6050,7 @@ func _draw() -> void:
 		var gp: Vector2 = g["pos"]
 		var bob := sin(float(g["t"]) * 4.0) * 2.0
 		var gc: Color = LOOT_ITEM_COLOR.get(g["kind"], Color(0.7, 0.7, 0.72))
-		draw_circle(gp + Vector2(0, bob) + Vector2(1, 2), CELL_SIZE * 0.16, Color(0, 0, 0, 0.30))
-		draw_circle(gp + Vector2(0, bob), CELL_SIZE * 0.16, gc)
-		draw_arc(gp + Vector2(0, bob), CELL_SIZE * 0.16, 0.0, TAU, 12, Color(1, 1, 1, 0.6), 1.0)
+		_draw_loot_icon(String(g["kind"]), gp + Vector2(0, bob), gc, float(g["t"]))
 
 	# Death poofs (expanding ring + green debris).
 	for p in _poofs:
@@ -5613,6 +6062,15 @@ func _draw() -> void:
 		for k in range(5):
 			var ang := TAU * float(k) / 5.0
 			draw_circle(pp + Vector2(cos(ang), sin(ang)) * prad * 0.9, maxf(1.0, CELL_SIZE * 0.07 * pa), Color(0.35, 0.58, 0.30, pa))
+
+	# Floating damage numbers.
+	var dfont := ThemeDB.fallback_font
+	for dt in _dmg_texts:
+		var dp: Vector2 = dt["pos"] + Vector2(0, -float(dt["t"]) * 26.0)
+		var da := clampf(1.0 - float(dt["t"]) / 0.8, 0.0, 1.0)
+		var dc: Color = dt["col"]
+		draw_string_outline(dfont, dp, dt["text"], HORIZONTAL_ALIGNMENT_CENTER, -1, 12, 4, Color(0, 0, 0, da * 0.8))
+		draw_string(dfont, dp, dt["text"], HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color(dc.r, dc.g, dc.b, da))
 
 	# Punch: arm + fist (only the fist deals damage).
 	if _punch_active:
@@ -5660,7 +6118,9 @@ func _draw() -> void:
 
 	# Player: gorilla (white flash when hurt).
 	var prect := Rect2(_player_pos - cell_vec * 0.5, cell_vec)
-	draw_texture_rect(_tex_gorilla, prect, false)
+	_draw_shadow(_player_pos + Vector2(0, CELL_SIZE * 0.3), CELL_SIZE * 0.4)
+	var blink := _invuln_t > 0.0 and int(_invuln_t * 30.0) % 2 == 0
+	draw_texture_rect(_tex_gorilla, prect, false, Color(1, 1, 1, 0.45) if blink else Color.WHITE)
 	if _hurt_flash > 0.0:
 		draw_texture_rect(_tex_gorilla_flash, prect, false, Color(1, 1, 1, clampf(_hurt_flash / FLASH_TIME, 0.0, 1.0) * 0.85))
 
@@ -5794,6 +6254,33 @@ func _bake_sprites() -> void:
 	# GRASS
 	var g := _img16(); g.fill(GRASS); _speckle(g, GRASS_D, GRASS_L, 1)
 	_tiles[Terrain.GRASS] = _mktex(g)
+	# Grass variants so open ground isn't one repeating tile: plain speckles, a tuft,
+	# a little flower, a pebble. Picked per-cell by a stable hash in _draw.
+	_grass_var.clear()
+	for vs in [1, 11, 23]:
+		var gv := _img16(); gv.fill(GRASS); _speckle(gv, GRASS_D, GRASS_L, vs)
+		_grass_var.append(_mktex(gv))
+	var gt := _img16(); gt.fill(GRASS); _speckle(gt, GRASS_D, GRASS_L, 7)
+	for tx in [[4, 10], [10, 5]]:
+		_vline(gt, tx[0], tx[1] - 2, tx[1], GRASS_L); _px(gt, tx[0] - 1, tx[1] - 1, GRASS_L); _px(gt, tx[0] + 1, tx[1] - 2, GRASS_L)
+		_px(gt, tx[0], tx[1] + 1, GRASS_D)
+	_grass_var.append(_mktex(gt))
+	var gf := _img16(); gf.fill(GRASS); _speckle(gf, GRASS_D, GRASS_L, 5)
+	_px(gf, 5, 6, Color(0.95, 0.95, 0.85)); _px(gf, 4, 6, Color(0.95, 0.85, 0.35)); _px(gf, 6, 6, Color(0.95, 0.85, 0.35))
+	_px(gf, 5, 5, Color(0.95, 0.85, 0.35)); _px(gf, 5, 7, Color(0.95, 0.85, 0.35)); _px(gf, 5, 6, Color(0.98, 0.98, 0.9))
+	_px(gf, 11, 11, Color(0.90, 0.55, 0.70)); _px(gf, 11, 12, GRASS_D)
+	_grass_var.append(_mktex(gf))
+	var gp := _img16(); gp.fill(GRASS); _speckle(gp, GRASS_D, GRASS_L, 9)
+	_disc(gp, 10, 10, 1, Color(0.58, 0.58, 0.60)); _px(gp, 10, 9, Color(0.72, 0.72, 0.75)); _px(gp, 11, 11, Color(0.40, 0.40, 0.43))
+	_grass_var.append(_mktex(gp))
+	# Soft radial glow for lamps (alpha falls off smoothly to nothing at the rim).
+	var gi := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	for gy in range(64):
+		for gx in range(64):
+			var gd := Vector2(gx - 31.5, gy - 31.5).length() / 32.0
+			var ga := clampf(1.0 - gd, 0.0, 1.0)
+			gi.set_pixel(gx, gy, Color(1, 1, 1, ga * ga))
+	_tex_glow = _mktex(gi)
 
 	# WATER
 	var w := _img16(); w.fill(WATER); _speckle(w, WATER_L, WATER, 2)
@@ -6235,6 +6722,11 @@ func _run_selftest() -> void:
 	# --- Night / day cycle ---
 	var nt := Vector2i(10, 10)
 	var ns := Vector2i(11, 10)
+	_day = 1
+	while _night_cover(_cell_index(nt), Terrain.TREE):   # pick cells that will clear
+		nt.x += 2
+	while _night_cover(_cell_index(ns), Terrain.STONE):
+		ns.y += 2
 	_set_terrain(nt, Terrain.TREE); _banana[_cell_index(nt)] = 0
 	_set_terrain(ns, Terrain.STONE)
 	_monsters.clear(); _night_snapshot.clear()
@@ -6331,7 +6823,7 @@ func _run_selftest() -> void:
 	_monsters = []
 	_start_punch(_player_pos + Vector2(100, 0))
 	_update_punch(PUNCH_TIME * 0.2)   # still extending
-	_damage_player(1.0, _player_pos + Vector2(10, 0))
+	_invuln_t = 0.0; _damage_player(1.0, _player_pos + Vector2(10, 0))
 	var ok_cancel: bool = not _punch_active
 	_report("getting hurt cancels an extending punch", ok_cancel); fails += int(not ok_cancel)
 
@@ -6346,7 +6838,7 @@ func _run_selftest() -> void:
 	_is_night = false
 	_lives = MAX_LIVES
 	_health = 10.0
-	_damage_player(50.0)   # death
+	_invuln_t = 0.0; _damage_player(50.0)   # death
 	var ok_life: bool = _lives == MAX_LIVES - 1 and _health == HEALTH_MAX
 	_report("death costs a life and respawns", ok_life); fails += int(not ok_life)
 
@@ -6354,7 +6846,7 @@ func _run_selftest() -> void:
 	_resources = {"wood": 9, "stone": 9, "banana": 9, "berry": 0, "rotten_banana": 0, "rotten_berry": 0}
 	_day = 5
 	_health = 10.0
-	_damage_player(50.0)   # last life -> game over reset
+	_invuln_t = 0.0; _damage_player(50.0)   # last life -> game over reset
 	var ok_over: bool = _lives == MAX_LIVES and _day == 1 and _resources["wood"] == 0
 	_report("losing last life resets to a new run", ok_over); fails += int(not ok_over)
 
@@ -6376,7 +6868,7 @@ func _run_selftest() -> void:
 	_alloc["armor"] = 10
 	_recompute_player_stats()
 	_health = _p_max_health
-	_damage_player(10.0)
+	_invuln_t = 0.0; _damage_player(10.0)
 	var ok_armor: bool = absf(_health - (_p_max_health - 10.0 * (1.0 - _p_armor))) < 0.01 and _p_armor > 0.0
 	_report("armor reduces incoming damage", ok_armor); fails += int(not ok_armor)
 
@@ -6407,7 +6899,7 @@ func _run_selftest() -> void:
 	# --- Combat juice ---
 	_shake = 0.0; _hurt_flash = 0.0; _poofs = []
 	_player_pos = _cell_center_world(Vector2i(20, 20))
-	_damage_player(5.0, _player_pos + Vector2(10, 0))
+	_invuln_t = 0.0; _damage_player(5.0, _player_pos + Vector2(10, 0))
 	var ok_feel: bool = _hurt_flash > 0.0 and _shake > 0.0
 	_report("getting hit triggers flash + shake", ok_feel); fails += int(not ok_feel)
 
@@ -6450,7 +6942,7 @@ func _run_selftest() -> void:
 
 	# Fireball burns over time.
 	_clear_status_effects(); _health = 100.0
-	_apply_fire_hit(_player_pos + Vector2(40, 0))
+	_invuln_t = 0.0; _apply_fire_hit(_player_pos + Vector2(40, 0))
 	var burn_started: bool = _burn_t > 0.0 and _health < 100.0
 	var hp_after_fire := _health
 	_update_status_effects(0.5)
@@ -6459,18 +6951,18 @@ func _run_selftest() -> void:
 
 	# Snowball slows; slow does not re-stack while already slowed.
 	_clear_status_effects(); _health = 100.0
-	_apply_snow_hit(_player_pos + Vector2(40, 0))
+	_invuln_t = 0.0; _apply_snow_hit(_player_pos + Vector2(40, 0))
 	var slow1 := _slow_t
 	_slow_t = 0.4
-	_apply_snow_hit(_player_pos + Vector2(40, 0))
+	_invuln_t = 0.0; _apply_snow_hit(_player_pos + Vector2(40, 0))
 	var ok_slow: bool = slow1 == SLOW_TIME and _slow_t == 0.4
 	_report("snowball slows (no re-stack)", ok_slow); fails += int(not ok_slow)
 
 	# Three snowballs freeze; a fourth doesn't extend the freeze.
 	_clear_status_effects(); _health = 100.0
-	_apply_snow_hit(_player_pos); _apply_snow_hit(_player_pos); _apply_snow_hit(_player_pos)
+	_invuln_t = 0.0; _apply_snow_hit(_player_pos); _apply_snow_hit(_player_pos); _apply_snow_hit(_player_pos)
 	var froze := _freeze_t
-	_apply_snow_hit(_player_pos)
+	_invuln_t = 0.0; _apply_snow_hit(_player_pos)
 	var ok_freeze: bool = froze == FREEZE_TIME and _freeze_t == FREEZE_TIME
 	_report("3 snowballs freeze (no stack)", ok_freeze); fails += int(not ok_freeze)
 
@@ -7740,6 +8232,110 @@ func _run_selftest() -> void:
 	var ok_honey_eat: bool = _inv("honey") == 0 and _energy > 50.0
 	_report("raw honey is edible", ok_honey_eat); fails += int(not ok_honey_eat)
 
+	# --- Regression: collision / stuck-in-block fixes ---
+	# A body wedged in a solid tile is popped back out to open ground.
+	var wc := Vector2i(20, 40)
+	for dx in range(-3, 4):
+		for dy in range(-3, 4):
+			_set_terrain(wc + Vector2i(dx, dy), Terrain.GRASS)
+	_set_terrain(wc, Terrain.WOOD_WALL)
+	var stuck := _cell_center_world(wc)
+	var freed := _move_collide(stuck, Vector2(1, 0), PLAYER_RADIUS, WALKABLE)
+	var ok_depen: bool = not _box_blocked(freed, PLAYER_RADIUS, WALKABLE)
+	_report("body inside a wall is pushed out", ok_depen); fails += int(not ok_depen)
+
+	# Respawn never lands inside a structure.
+	var mid := Vector2i(GRID_CELLS / 2, GRID_CELLS / 2)
+	_set_terrain(mid, Terrain.WOOD_WALL)
+	var rc := _nearest_walkable_cell(mid)
+	var ok_resp: bool = rc != mid and WALKABLE.has(_terrain_at(rc))
+	_report("respawn cell is walkable", ok_resp); fails += int(not ok_resp)
+	_set_terrain(mid, Terrain.GRASS)
+
+	# Can't wall over a croc whose body only overlaps the cell edge.
+	var kc := Vector2i(22, 44)
+	_set_terrain(kc, Terrain.GRASS)
+	_monsters.clear()
+	_monsters.append(_mk_croc(_cell_center_world(kc) - Vector2(CELL_SIZE * 0.6, 0), 10.0))
+	_cell = Vector2i(5, 5); _player_pos = _cell_center_world(_cell)
+	_resources = _default_inventory(); _resources["wood"] = 10
+	_build_struct = "wood_wall"; _drag_action = BuildAction.BUILD
+	_apply_build_at(kc)
+	var ok_croc_block: bool = _terrain_at(kc) == Terrain.GRASS
+	_report("can't build onto an edge-overlapping croc", ok_croc_block); fails += int(not ok_croc_block)
+
+	# Stacked crocs spread apart.
+	_monsters.clear()
+	var sp := _cell_center_world(Vector2i(24, 44))
+	_monsters.append(_mk_croc(sp, 10.0)); _monsters.append(_mk_croc(sp + Vector2(1, 0), 10.0))
+	for _i in range(60):
+		_separate_monsters(1.0 / 60.0)
+	var sep_d: float = (_monsters[0]["pos"] as Vector2).distance_to(_monsters[1]["pos"])
+	var ok_sep: bool = sep_d >= MONSTER_RADIUS * 2.0 * CROC_SEPARATION - 0.5
+	_report("overlapping crocs push apart", ok_sep); fails += int(not ok_sep)
+	_monsters.clear()
+
+	# Post-hit invulnerability: a second hit inside the window is ignored.
+	_health = _p_max_health; _invuln_t = 0.0; _p_armor = 0.0
+	_damage_player(10.0)
+	var hp_after_first := _health
+	_damage_player(10.0)
+	var ok_iframes: bool = hp_after_first == _p_max_health - 10.0 and _health == hp_after_first
+	_report("i-frames ignore a second hit", ok_iframes); fails += int(not ok_iframes)
+	_invuln_t = 0.0
+	_damage_player(10.0)
+	var ok_iframes2: bool = _health == hp_after_first - 10.0
+	_report("damage resumes after i-frames", ok_iframes2); fails += int(not ok_iframes2)
+	_invuln_t = 0.0
+
+	# --- Balance / audio regressions ---
+	var ok_speed: bool = CROC_SPEED < PLAYER_SPEED
+	_report("night-1 crocs are slower than the player", ok_speed); fails += int(not ok_speed)
+	_nights_survived = 4   # night 5: flankers active
+	_monsters.clear(); _cell = Vector2i(25, 25); _player_pos = _cell_center_world(_cell)
+	_spawn_monsters(20)
+	var edge_n := 0
+	for m in _monsters:
+		var mc := _world_to_cell(m["pos"])
+		if mc.x < EDGE_BAND or mc.y < EDGE_BAND or mc.x >= GRID_CELLS - EDGE_BAND or mc.y >= GRID_CELLS - EDGE_BAND:
+			edge_n += 1
+	var ok_flank: bool = _monsters.size() == 20 and edge_n >= 4
+	_report("later raids flank in from the map edges", ok_flank); fails += int(not ok_flank)
+	_monsters.clear(); _nights_survived = 0
+	_build_sfx()
+	var ok_sfx: bool = _sfx.size() >= 10 and (_sfx["hit"] as AudioStreamWAV).data.size() > 100
+	_report("sfx synthesise to non-empty streams", ok_sfx); fails += int(not ok_sfx)
+	var mus := _synth_music("night")
+	var ok_mus: bool = mus.loop_mode == AudioStreamWAV.LOOP_FORWARD and mus.data.size() == int(MUSIC_LEN * MUSIC_RATE) * 2
+	_report("music loop renders at the right length", ok_mus); fails += int(not ok_mus)
+	_sfx.clear()
+
+	# --- Night cover: some trees/rocks stay up ---
+	_day = 1; _cell = Vector2i(2, 2)
+	var kept := 0
+	for cx in range(20, 40):
+		_set_terrain(Vector2i(cx, 45), Terrain.TREE)
+		if _night_cover(_cell_index(Vector2i(cx, 45)), Terrain.TREE):
+			kept += 1
+	var ok_cover: bool = kept > 0 and kept < 20 and not _night_cover(_cell_index(Vector2i(20, 45)), Terrain.BUSH)
+	_report("some (not all) trees stay as night cover", ok_cover); fails += int(not ok_cover)
+	_cell = Vector2i(30, 45)
+	var ok_cover2: bool = not _night_cover(_cell_index(Vector2i(31, 45)), Terrain.TREE)
+	_report("no cover forms right next to the player", ok_cover2); fails += int(not ok_cover2)
+	for cx in range(20, 40):
+		_set_terrain(Vector2i(cx, 45), Terrain.GRASS)
+
+	# --- Visual helpers ---
+	var ok_grass: bool = _grass_var.size() == 6 and _tex_glow != null
+	_report("grass variants and glow sprite baked", ok_grass); fails += int(not ok_grass)
+	var ok_hash: bool = _cell_hash(3, 4) == _cell_hash(3, 4) and _cell_hash(3, 4) != _cell_hash(4, 3)
+	_report("cell hash is stable and varied", ok_hash); fails += int(not ok_hash)
+	_dmg_texts.clear()
+	_add_dmg_text(Vector2.ZERO, 3.4, Color.WHITE)
+	var ok_dmg: bool = _dmg_texts.size() == 1 and _dmg_texts[0]["text"] == "3"
+	_report("damage numbers spawn", ok_dmg); fails += int(not ok_dmg)
+	_dmg_texts.clear()
+
 	_nights_survived = 0; _init_progression(); _day = 1; _resources = _default_inventory()
 
 	print("SELFTEST DONE, failures=%d" % fails)
@@ -7845,6 +8441,12 @@ func _handle_shot_arg() -> void:
 				_monsters.append(mc)
 				i += 1
 			queue_redraw()
+		if "--loot" in args:
+			var li := 0
+			for lk in ["bone", "croc_hide", "wood", "stone", "glapple", "worm", "bee", "banana"]:
+				_spawn_loot(lk, 1, _player_pos + Vector2(-4 + li * 1.2, 2.5) * CELL_SIZE)
+				li += 1
+			_ground_items.map(func(g): g["t"] = 0.0)
 		if "--levelup" in args:
 			_level = 4
 			_alloc = {"health": 1, "attack": 1, "speed": 0, "armor": 1, "regen": 0}
