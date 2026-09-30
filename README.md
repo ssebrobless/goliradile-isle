@@ -37,7 +37,7 @@ to fit the window, so any size keeps the same layout.
 
 - **Day:** gather wood/stone/grass/bananas/berries/coconuts/bamboo/ore/sand, build a base,
   craft tools, weapons, machines, and defenses.
-- **Night:** the land clears and crocodiles hunt you — nine color-coded types that each
+- **Night:** most of the land clears (a few trees and rocks stay up as cover) and crocodiles hunt you — nine color-coded types that each
   fight differently. Turrets, traps, and a powered defense network do the heavy lifting.
 - **Tech ladder:** kiln → metal/glass → bees/worms/fish/farming → berry-oil still →
   generators + wires (powered turrets) → pipes + a breeding aquarium. Deep nights demand

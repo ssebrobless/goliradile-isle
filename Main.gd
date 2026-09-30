@@ -278,6 +278,7 @@ const MONSTER_BASE: int = 3            # monsters on night 1
 const MONSTER_PER_DAY: float = 1.6     # extra monsters each subsequent night
 const MONSTER_CAP: int = 28
 const SPAWN_MIN_DIST: int = 11         # spawn at least this far from the player
+const COVER_PCT: int = 30              # % of trees/rocks that stay standing at night as cover
 const FLANK_NIGHT: int = 4             # from this night on, some crocs land on the map edge
 const FLANK_FRAC: float = 0.4          # share of a raid that flanks in from the edges
 const EDGE_BAND: int = 3               # flankers spawn within this many cells of the border
@@ -1004,6 +1005,17 @@ func _apply_daylight() -> void:
 		_canvas_mod.color = NIGHT_COLOR.lerp(Color.WHITE, _daylight(_time))
 
 
+# Some trees and rocks survive the nightly clearing, giving you and the crocs
+# terrain to duck behind (stable per cell, reshuffled each night).
+func _night_cover(i: int, t: int) -> bool:
+	if t != Terrain.TREE and t != Terrain.STONE:
+		return false
+	var c := _index_cell(i)
+	if _chebyshev(c, _cell) <= 2:
+		return false   # never box the player in at the moment night falls
+	return (_cell_hash(c.x, c.y + _day * 7) % 100) < COVER_PCT
+
+
 func _begin_night() -> void:
 	_is_night = true
 	_play_sfx("night", 0.8, 0.0)
@@ -1017,6 +1029,8 @@ func _begin_night() -> void:
 	for i in range(_terrain.size()):
 		var t: int = _terrain[i]
 		if NATURAL.has(t):
+			if _night_cover(i, t):
+				continue   # this one stays up as cover
 			_night_snapshot[i] = {"t": t, "banana": _banana[i], "berry": _berry[i]}
 			_terrain[i] = Terrain.GRASS
 			_banana[i] = 0
@@ -5693,8 +5707,8 @@ func _build_help_panel() -> void:
 		_right_vbox.add_child(_label("Storage still works."))
 	else:
 		_right_vbox.add_child(_label("Gather and build by day."))
-		_right_vbox.add_child(_label("At night the land clears and"))
-		_right_vbox.add_child(_label("crocodiles hunt you -- wall"))
+		_right_vbox.add_child(_label("At night most of the land clears and"))
+		_right_vbox.add_child(_label("crocs hunt you -- wall"))
 		_right_vbox.add_child(_label("yourself in behind a door."))
 		_right_vbox.add_child(_label("Build turrets + spike traps to"))
 		_right_vbox.add_child(_label("let the base fight for you."))
@@ -5804,6 +5818,49 @@ func _draw_shadow(p: Vector2, r: float, a: float = 0.28) -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
+# A recognisable little icon per loot kind (falls back to a tinted gem).
+func _draw_loot_icon(kind: String, p: Vector2, col: Color, t: float) -> void:
+	draw_set_transform(p + Vector2(1, 6), 0.0, Vector2(1.0, 0.4))
+	draw_circle(Vector2.ZERO, CELL_SIZE * 0.17, Color(0, 0, 0, 0.30))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var u := CELL_SIZE / 32.0
+	match kind:
+		"bone":
+			draw_line(p + Vector2(-5, 3) * u, p + Vector2(5, -3) * u, col, 2.5 * u)
+			for e in [Vector2(-6, 2), Vector2(-4, 5), Vector2(6, -2), Vector2(4, -5)]:
+				draw_circle(p + e * u, 2.0 * u, col)
+		"croc_hide":
+			draw_colored_polygon(PackedVector2Array([p + Vector2(-7, -3) * u, p + Vector2(-2, -6) * u, p + Vector2(5, -5) * u,
+				p + Vector2(7, 1) * u, p + Vector2(2, 6) * u, p + Vector2(-5, 5) * u]), col)
+			draw_line(p + Vector2(-4, -1) * u, p + Vector2(4, 1) * u, col.darkened(0.35), 1.5 * u)
+		"wood":
+			draw_line(p + Vector2(-6, 3) * u, p + Vector2(6, -3) * u, col, 4.0 * u)
+			draw_line(p + Vector2(-6, 3) * u, p + Vector2(6, -3) * u, col.lightened(0.25), 1.5 * u)
+		"stone":
+			draw_colored_polygon(PackedVector2Array([p + Vector2(-6, 3) * u, p + Vector2(-3, -5) * u, p + Vector2(4, -4) * u, p + Vector2(7, 3) * u]), col)
+			draw_line(p + Vector2(-3, -5) * u, p + Vector2(4, -4) * u, col.lightened(0.3), 1.5 * u)
+		"glapple":
+			draw_texture_rect(_tex_glow, Rect2(p - Vector2(14, 14) * u, Vector2(28, 28) * u), false, Color(0.4, 0.7, 1.0, 0.55 + 0.25 * sin(t * 5.0)))
+			draw_circle(p, 4.5 * u, col)
+			draw_circle(p + Vector2(-1.5, -1.5) * u, 1.5 * u, Color(1, 1, 1, 0.9))
+		"worm":
+			var prev := p + Vector2(-6, 0) * u
+			for k in range(1, 7):
+				var nxt := p + Vector2(-6 + k * 2.0, sin(t * 6.0 + k) * 2.5) * u
+				draw_line(prev, nxt, col, 2.5 * u)
+				prev = nxt
+		"bee":
+			var wob := Vector2(sin(t * 9.0) * 2.0, cos(t * 7.0) * 1.5) * u
+			draw_circle(p + wob + Vector2(-2, -3) * u, 2.5 * u, Color(0.85, 0.92, 1.0, 0.7))
+			draw_circle(p + wob + Vector2(2, -3) * u, 2.5 * u, Color(0.85, 0.92, 1.0, 0.7))
+			draw_circle(p + wob, 3.5 * u, col)
+			draw_line(p + wob + Vector2(-1, -3) * u, p + wob + Vector2(-1, 3) * u, Color(0.15, 0.12, 0.05), 1.2 * u)
+			draw_line(p + wob + Vector2(1.5, -3) * u, p + wob + Vector2(1.5, 3) * u, Color(0.15, 0.12, 0.05), 1.2 * u)
+		_:
+			draw_circle(p, CELL_SIZE * 0.16, col)
+			draw_arc(p, CELL_SIZE * 0.16, 0.0, TAU, 12, Color(1, 1, 1, 0.6), 1.0)
+
+
 func _add_dmg_text(pos: Vector2, amount: float, col: Color) -> void:
 	_dmg_texts.append({"pos": pos + Vector2(randf_range(-6.0, 6.0), -CELL_SIZE * 0.4), "text": str(maxi(1, int(round(amount)))), "t": 0.0, "col": col})
 	if _dmg_texts.size() > 40:
@@ -5840,6 +5897,24 @@ func _draw() -> void:
 			if _struct_hp.has(idx):
 				var frac := 1.0 - float(_struct_hp[idx]) / float(BREAK_HP.get(_terrain[idx], 1))
 				draw_rect(Rect2(pos, cell_vec), Color(0.0, 0.0, 0.0, 0.55 * frac), true)
+
+	# Grounding: tall things cast a soft shadow onto the tile below them, and solid
+	# blocks get a dark lip along their lower edge.
+	for y in range(GRID_CELLS - 1):
+		for x in range(GRID_CELLS):
+			var sidx := y * GRID_CELLS + x
+			var st: int = _terrain[sidx]
+			var below: int = _terrain[sidx + GRID_CELLS]
+			if below != Terrain.GRASS and below != Terrain.FLOOR and below != Terrain.SAND:
+				continue
+			var bp := Vector2(x, y + 1) * CELL_SIZE
+			if st == Terrain.TREE or st == Terrain.COCONUT or st == Terrain.STONE or st == Terrain.BUSH:
+				draw_set_transform(bp + Vector2(CELL_SIZE * 0.55, 0.0), 0.0, Vector2(1.0, 0.35))
+				draw_circle(Vector2.ZERO, CELL_SIZE * 0.42, Color(0, 0, 0, 0.20))
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			elif st == Terrain.WOOD_WALL or st == Terrain.STONE_WALL or st == Terrain.WORKBENCH or st == Terrain.STORAGE:
+				draw_rect(Rect2(bp, Vector2(CELL_SIZE, 4.0)), Color(0, 0, 0, 0.22))
+				draw_rect(Rect2(bp + Vector2(0, 4.0), Vector2(CELL_SIZE, 3.0)), Color(0, 0, 0, 0.10))
 
 	# Light sources cast a soft glow when it's dark (glapple lamps for now).
 	var dl := _daylight(_time)
@@ -5893,8 +5968,8 @@ func _draw() -> void:
 		# Dead-but-reviving black croc: greyed, lying in place.
 		var reviving: bool = m["hp"] <= 0.0 and m["role"] == "reviver" and not m["revived"]
 		var left: bool = (_player_pos.x - mp.x) < 0
-		var rect := Rect2(mp - cell_vec * 0.5, cell_vec)
-		_draw_shadow(mp + Vector2(0, CELL_SIZE * 0.22), CELL_SIZE * 0.36)
+		var rect := Rect2(mp - cell_vec * 0.68, cell_vec * 1.36)   # crocs read bigger than one tile
+		_draw_shadow(mp + Vector2(0, CELL_SIZE * 0.22), CELL_SIZE * 0.46)
 		draw_texture_rect(tex["l"] if left else tex["r"], rect, false,
 			Color(0.5, 0.5, 0.55) if reviving else Color.WHITE)
 		if m["flash"] > 0.0:
@@ -5975,9 +6050,7 @@ func _draw() -> void:
 		var gp: Vector2 = g["pos"]
 		var bob := sin(float(g["t"]) * 4.0) * 2.0
 		var gc: Color = LOOT_ITEM_COLOR.get(g["kind"], Color(0.7, 0.7, 0.72))
-		draw_circle(gp + Vector2(0, bob) + Vector2(1, 2), CELL_SIZE * 0.16, Color(0, 0, 0, 0.30))
-		draw_circle(gp + Vector2(0, bob), CELL_SIZE * 0.16, gc)
-		draw_arc(gp + Vector2(0, bob), CELL_SIZE * 0.16, 0.0, TAU, 12, Color(1, 1, 1, 0.6), 1.0)
+		_draw_loot_icon(String(g["kind"]), gp + Vector2(0, bob), gc, float(g["t"]))
 
 	# Death poofs (expanding ring + green debris).
 	for p in _poofs:
@@ -6649,6 +6722,11 @@ func _run_selftest() -> void:
 	# --- Night / day cycle ---
 	var nt := Vector2i(10, 10)
 	var ns := Vector2i(11, 10)
+	_day = 1
+	while _night_cover(_cell_index(nt), Terrain.TREE):   # pick cells that will clear
+		nt.x += 2
+	while _night_cover(_cell_index(ns), Terrain.STONE):
+		ns.y += 2
 	_set_terrain(nt, Terrain.TREE); _banana[_cell_index(nt)] = 0
 	_set_terrain(ns, Terrain.STONE)
 	_monsters.clear(); _night_snapshot.clear()
@@ -8232,6 +8310,21 @@ func _run_selftest() -> void:
 	_report("music loop renders at the right length", ok_mus); fails += int(not ok_mus)
 	_sfx.clear()
 
+	# --- Night cover: some trees/rocks stay up ---
+	_day = 1; _cell = Vector2i(2, 2)
+	var kept := 0
+	for cx in range(20, 40):
+		_set_terrain(Vector2i(cx, 45), Terrain.TREE)
+		if _night_cover(_cell_index(Vector2i(cx, 45)), Terrain.TREE):
+			kept += 1
+	var ok_cover: bool = kept > 0 and kept < 20 and not _night_cover(_cell_index(Vector2i(20, 45)), Terrain.BUSH)
+	_report("some (not all) trees stay as night cover", ok_cover); fails += int(not ok_cover)
+	_cell = Vector2i(30, 45)
+	var ok_cover2: bool = not _night_cover(_cell_index(Vector2i(31, 45)), Terrain.TREE)
+	_report("no cover forms right next to the player", ok_cover2); fails += int(not ok_cover2)
+	for cx in range(20, 40):
+		_set_terrain(Vector2i(cx, 45), Terrain.GRASS)
+
 	# --- Visual helpers ---
 	var ok_grass: bool = _grass_var.size() == 6 and _tex_glow != null
 	_report("grass variants and glow sprite baked", ok_grass); fails += int(not ok_grass)
@@ -8348,6 +8441,12 @@ func _handle_shot_arg() -> void:
 				_monsters.append(mc)
 				i += 1
 			queue_redraw()
+		if "--loot" in args:
+			var li := 0
+			for lk in ["bone", "croc_hide", "wood", "stone", "glapple", "worm", "bee", "banana"]:
+				_spawn_loot(lk, 1, _player_pos + Vector2(-4 + li * 1.2, 2.5) * CELL_SIZE)
+				li += 1
+			_ground_items.map(func(g): g["t"] = 0.0)
 		if "--levelup" in args:
 			_level = 4
 			_alloc = {"health": 1, "attack": 1, "speed": 0, "armor": 1, "regen": 0}
