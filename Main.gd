@@ -555,7 +555,7 @@ const REGROW_STRUCT_BUFFER: int = 1
 const NATURAL_BASELINE_MIN: int = 200   # fallback target if an old save lacks one
 
 # --- Colors ------------------------------------------------------------------
-const COLOR_GRID: Color = Color(0.0, 0.0, 0.0, 0.18)
+const COLOR_GRID: Color = Color(0.0, 0.0, 0.0, 0.07)
 const COLOR_PLAYER: Color = Color(1.0, 0.85, 0.1)
 const COLOR_FACE: Color = Color(0.15, 0.12, 0.0)
 const COLOR_FACE_HL: Color = Color(1.0, 1.0, 1.0, 0.85)
@@ -762,6 +762,9 @@ var _canvas_mod: CanvasModulate
 # Baked pixel-art textures
 var _tiles := {}                  # Terrain -> ImageTexture
 var _tex_gorilla: ImageTexture
+var _grass_var: Array = []        # ImageTextures: plain / tufted / flowered / pebbly grass
+var _tex_glow: ImageTexture       # soft radial light sprite
+var _dmg_texts: Array = []        # [{pos:Vector2, text:String, t:float, col:Color}] floating numbers
 var _tex_croc_r: ImageTexture
 var _tex_croc_l: ImageTexture
 var _tex_croc_flash_r: ImageTexture
@@ -935,7 +938,7 @@ func _process(delta: float) -> void:
 	if input != Vector2.ZERO or _player_kb.length() > 1.0 or _punch_active \
 			or not _monsters.is_empty() or not _poofs.is_empty() or _spark_t < 1.0 or _shake > 0.0 \
 			or not _projectiles.is_empty() or not _poison_clouds.is_empty() \
-			or not _ground_items.is_empty() or not _fish.is_empty() or not _peels.is_empty() \
+			or not _ground_items.is_empty() or not _dmg_texts.is_empty() or not _fish.is_empty() or not _peels.is_empty() \
 			or _burn_t > 0.0 or _freeze_t > 0.0 or _slow_t > 0.0:
 		queue_redraw()
 
@@ -1672,6 +1675,7 @@ func _damage_player(dmg: float, from_pos: Vector2 = Vector2.INF) -> void:
 	if _invuln_t > 0.0:
 		return   # still recovering from the last hit
 	_invuln_t = HURT_INVULN
+	_add_dmg_text(_player_pos, dmg * (1.0 - _p_armor), Color(1.0, 0.45, 0.40))
 	_play_sfx("hurt", 1.0, 0.04)
 	_health = maxf(0.0, _health - dmg * (1.0 - _p_armor))  # armor reduces incoming damage
 	_hurt_flash = FLASH_TIME * 1.6
@@ -2218,7 +2222,9 @@ func _update_trickster_marks(delta: float) -> void:
 # and records who gets the kill (a turret cell idx, or "player").
 func _hurt_croc(m: Dictionary, dmg: float, kb_vec: Vector2, kb_mult: float, killer) -> void:
 	var mult := 1.2 if m["marked"] else 1.0
-	m["hp"] = float(m["hp"]) - dmg * (1.0 - float(m["armor"])) * mult
+	var dealt: float = dmg * (1.0 - float(m["armor"])) * mult
+	m["hp"] = float(m["hp"]) - dealt
+	_add_dmg_text(m["pos"], dealt, Color(1.0, 0.95, 0.6))
 	m["flash"] = FLASH_TIME
 	if kb_mult > 0.0:
 		var d := kb_vec.normalized() if kb_vec.length() > 0.01 else Vector2.RIGHT
@@ -3628,6 +3634,9 @@ func _update_juice(delta: float) -> void:
 		_camera.position += Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake
 
 	_hurt_flash = maxf(0.0, _hurt_flash - delta)
+	for dt in _dmg_texts:
+		dt["t"] = float(dt["t"]) + delta
+	_dmg_texts = _dmg_texts.filter(func(d): return float(d["t"]) < 0.8)
 	if _spark_t < 1.0:
 		_spark_t = minf(1.0, _spark_t + delta / SPARK_TIME)
 
@@ -5781,13 +5790,44 @@ func _cost_text(cost: Dictionary) -> String:
 # -----------------------------------------------------------------------------
 # Drawing (board only -- gameplay visual cues, no text)
 # -----------------------------------------------------------------------------
+# Stable per-cell pseudo-random number (drives grass variants and tint).
+func _cell_hash(x: int, y: int) -> int:
+	var h := (x * 73856093) ^ (y * 19349663) ^ 0x5bd1e995
+	h = (h ^ (h >> 13)) * 1274126177
+	return absi(h ^ (h >> 16))
+
+
+# Flat oval drop shadow under a character; the caller passes its feet position.
+func _draw_shadow(p: Vector2, r: float, a: float = 0.28) -> void:
+	draw_set_transform(p, 0.0, Vector2(1.0, 0.42))
+	draw_circle(Vector2.ZERO, r, Color(0, 0, 0, a))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _add_dmg_text(pos: Vector2, amount: float, col: Color) -> void:
+	_dmg_texts.append({"pos": pos + Vector2(randf_range(-6.0, 6.0), -CELL_SIZE * 0.4), "text": str(maxi(1, int(round(amount)))), "t": 0.0, "col": col})
+	if _dmg_texts.size() > 40:
+		_dmg_texts.pop_front()
+
+
 func _draw() -> void:
 	var cell_vec := Vector2(CELL_SIZE, CELL_SIZE)
 	for y in range(GRID_CELLS):
 		for x in range(GRID_CELLS):
 			var idx := y * GRID_CELLS + x
 			var pos := Vector2(x, y) * CELL_SIZE
-			draw_texture_rect(_tiles[_terrain[idx]], Rect2(pos, cell_vec), false)
+			if _terrain[idx] == Terrain.GRASS and not _grass_var.is_empty():
+				var gh := _cell_hash(x, y)
+				var gvi := 0
+				var gsel := gh % 100
+				if gsel >= 88: gvi = 5       # pebble
+				elif gsel >= 82: gvi = 4     # flower
+				elif gsel >= 66: gvi = 3     # tuft
+				else: gvi = gsel % 3         # plain
+				var tint := 0.975 + float((gh >> 8) % 6) * 0.01
+				draw_texture_rect(_grass_var[gvi], Rect2(pos, cell_vec), false, Color(tint, tint, tint))
+			else:
+				draw_texture_rect(_tiles[_terrain[idx]], Rect2(pos, cell_vec), false)
 			if _terrain[idx] == Terrain.TREE and _banana[idx] == 1:
 				draw_texture_rect(_tex_banana, Rect2(pos, cell_vec), false)
 			elif _terrain[idx] == Terrain.COCONUT and _banana[idx] == 1:
@@ -5809,9 +5849,7 @@ func _draw() -> void:
 			var lp: Vector2 = ls["pos"]
 			var lr: float = ls["radius"]
 			var lc: Color = ls["color"]
-			for ri in range(5):
-				var rr := lr * (1.0 - float(ri) / 5.0)
-				draw_circle(lp, rr, Color(lc.r, lc.g, lc.b, 0.12 * night_amt))
+			draw_texture_rect(_tex_glow, Rect2(lp - Vector2(lr, lr), Vector2(lr, lr) * 2.0), false, Color(lc.r, lc.g, lc.b, 0.55 * night_amt))
 
 	var side := float(GRID_CELLS) * CELL_SIZE
 	for i in range(GRID_CELLS + 1):
@@ -5856,11 +5894,19 @@ func _draw() -> void:
 		var reviving: bool = m["hp"] <= 0.0 and m["role"] == "reviver" and not m["revived"]
 		var left: bool = (_player_pos.x - mp.x) < 0
 		var rect := Rect2(mp - cell_vec * 0.5, cell_vec)
+		_draw_shadow(mp + Vector2(0, CELL_SIZE * 0.22), CELL_SIZE * 0.36)
 		draw_texture_rect(tex["l"] if left else tex["r"], rect, false,
 			Color(0.5, 0.5, 0.55) if reviving else Color.WHITE)
 		if m["flash"] > 0.0:
 			var fa: float = clampf(m["flash"] / FLASH_TIME, 0.0, 1.0)
 			draw_texture_rect(tex["fl"] if left else tex["fr"], rect, false, Color(1, 1, 1, fa))
+		# Health bar once a croc has taken damage.
+		if m["hp"] > 0.0 and m["hp"] < m["max_hp"]:
+			var hbw := CELL_SIZE * 0.7
+			var hbp := mp + Vector2(-hbw * 0.5, -CELL_SIZE * 0.52)
+			var hfrac := clampf(float(m["hp"]) / float(m["max_hp"]), 0.0, 1.0)
+			draw_rect(Rect2(hbp - Vector2(1, 1), Vector2(hbw + 2, 5)), Color(0, 0, 0, 0.65))
+			draw_rect(Rect2(hbp, Vector2(hbw * hfrac, 3)), Color(0.35, 0.85, 0.35).lerp(Color(0.9, 0.25, 0.2), 1.0 - hfrac))
 
 	# Green "+" over crocs currently being mended by a white croc.
 	for m in _monsters:
@@ -5944,6 +5990,15 @@ func _draw() -> void:
 			var ang := TAU * float(k) / 5.0
 			draw_circle(pp + Vector2(cos(ang), sin(ang)) * prad * 0.9, maxf(1.0, CELL_SIZE * 0.07 * pa), Color(0.35, 0.58, 0.30, pa))
 
+	# Floating damage numbers.
+	var dfont := ThemeDB.fallback_font
+	for dt in _dmg_texts:
+		var dp: Vector2 = dt["pos"] + Vector2(0, -float(dt["t"]) * 26.0)
+		var da := clampf(1.0 - float(dt["t"]) / 0.8, 0.0, 1.0)
+		var dc: Color = dt["col"]
+		draw_string_outline(dfont, dp, dt["text"], HORIZONTAL_ALIGNMENT_CENTER, -1, 12, 4, Color(0, 0, 0, da * 0.8))
+		draw_string(dfont, dp, dt["text"], HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color(dc.r, dc.g, dc.b, da))
+
 	# Punch: arm + fist (only the fist deals damage).
 	if _punch_active:
 		var fist := _fist_pos()
@@ -5990,6 +6045,7 @@ func _draw() -> void:
 
 	# Player: gorilla (white flash when hurt).
 	var prect := Rect2(_player_pos - cell_vec * 0.5, cell_vec)
+	_draw_shadow(_player_pos + Vector2(0, CELL_SIZE * 0.3), CELL_SIZE * 0.4)
 	var blink := _invuln_t > 0.0 and int(_invuln_t * 30.0) % 2 == 0
 	draw_texture_rect(_tex_gorilla, prect, false, Color(1, 1, 1, 0.45) if blink else Color.WHITE)
 	if _hurt_flash > 0.0:
@@ -6125,6 +6181,33 @@ func _bake_sprites() -> void:
 	# GRASS
 	var g := _img16(); g.fill(GRASS); _speckle(g, GRASS_D, GRASS_L, 1)
 	_tiles[Terrain.GRASS] = _mktex(g)
+	# Grass variants so open ground isn't one repeating tile: plain speckles, a tuft,
+	# a little flower, a pebble. Picked per-cell by a stable hash in _draw.
+	_grass_var.clear()
+	for vs in [1, 11, 23]:
+		var gv := _img16(); gv.fill(GRASS); _speckle(gv, GRASS_D, GRASS_L, vs)
+		_grass_var.append(_mktex(gv))
+	var gt := _img16(); gt.fill(GRASS); _speckle(gt, GRASS_D, GRASS_L, 7)
+	for tx in [[4, 10], [10, 5]]:
+		_vline(gt, tx[0], tx[1] - 2, tx[1], GRASS_L); _px(gt, tx[0] - 1, tx[1] - 1, GRASS_L); _px(gt, tx[0] + 1, tx[1] - 2, GRASS_L)
+		_px(gt, tx[0], tx[1] + 1, GRASS_D)
+	_grass_var.append(_mktex(gt))
+	var gf := _img16(); gf.fill(GRASS); _speckle(gf, GRASS_D, GRASS_L, 5)
+	_px(gf, 5, 6, Color(0.95, 0.95, 0.85)); _px(gf, 4, 6, Color(0.95, 0.85, 0.35)); _px(gf, 6, 6, Color(0.95, 0.85, 0.35))
+	_px(gf, 5, 5, Color(0.95, 0.85, 0.35)); _px(gf, 5, 7, Color(0.95, 0.85, 0.35)); _px(gf, 5, 6, Color(0.98, 0.98, 0.9))
+	_px(gf, 11, 11, Color(0.90, 0.55, 0.70)); _px(gf, 11, 12, GRASS_D)
+	_grass_var.append(_mktex(gf))
+	var gp := _img16(); gp.fill(GRASS); _speckle(gp, GRASS_D, GRASS_L, 9)
+	_disc(gp, 10, 10, 1, Color(0.58, 0.58, 0.60)); _px(gp, 10, 9, Color(0.72, 0.72, 0.75)); _px(gp, 11, 11, Color(0.40, 0.40, 0.43))
+	_grass_var.append(_mktex(gp))
+	# Soft radial glow for lamps (alpha falls off smoothly to nothing at the rim).
+	var gi := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	for gy in range(64):
+		for gx in range(64):
+			var gd := Vector2(gx - 31.5, gy - 31.5).length() / 32.0
+			var ga := clampf(1.0 - gd, 0.0, 1.0)
+			gi.set_pixel(gx, gy, Color(1, 1, 1, ga * ga))
+	_tex_glow = _mktex(gi)
 
 	# WATER
 	var w := _img16(); w.fill(WATER); _speckle(w, WATER_L, WATER, 2)
@@ -8148,6 +8231,17 @@ func _run_selftest() -> void:
 	var ok_mus: bool = mus.loop_mode == AudioStreamWAV.LOOP_FORWARD and mus.data.size() == int(MUSIC_LEN * MUSIC_RATE) * 2
 	_report("music loop renders at the right length", ok_mus); fails += int(not ok_mus)
 	_sfx.clear()
+
+	# --- Visual helpers ---
+	var ok_grass: bool = _grass_var.size() == 6 and _tex_glow != null
+	_report("grass variants and glow sprite baked", ok_grass); fails += int(not ok_grass)
+	var ok_hash: bool = _cell_hash(3, 4) == _cell_hash(3, 4) and _cell_hash(3, 4) != _cell_hash(4, 3)
+	_report("cell hash is stable and varied", ok_hash); fails += int(not ok_hash)
+	_dmg_texts.clear()
+	_add_dmg_text(Vector2.ZERO, 3.4, Color.WHITE)
+	var ok_dmg: bool = _dmg_texts.size() == 1 and _dmg_texts[0]["text"] == "3"
+	_report("damage numbers spawn", ok_dmg); fails += int(not ok_dmg)
+	_dmg_texts.clear()
 
 	_nights_survived = 0; _init_progression(); _day = 1; _resources = _default_inventory()
 
