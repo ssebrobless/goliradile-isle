@@ -28,7 +28,7 @@ extends Node2D
 const GRID_CELLS: int = 50
 const CELL_SIZE: float = 32.0
 const PLAYER_SPEED: float = 3.0 * CELL_SIZE   # pixels/second
-const CROC_SPEED: float = 3.0 * CELL_SIZE     # same as the player for now
+const CROC_SPEED: float = 2.6 * CELL_SIZE     # ~87% of player speed: you can outrun early crocs
 const PLAYER_RADIUS: float = CELL_SIZE * 0.34
 const MONSTER_RADIUS: float = CELL_SIZE * 0.34
 const CAMERA_ZOOM: float = 1.5
@@ -39,7 +39,7 @@ const PANEL_W: float = 280.0
 const ENERGY_MAX: float = 100.0
 const ENERGY_DRAIN: float = 0.4
 const ENERGY_NIGHT_EXTRA: float = 0.25
-const ENERGY_MOVE: float = 1.5         # per second while moving
+const ENERGY_MOVE: float = 0.75        # per second while moving
 const ENERGY_HARVEST: float = 1.5
 const ENERGY_BUILD: float = 0.5
 const EAT_RESTORE: float = 30.0
@@ -247,9 +247,9 @@ const TOOL_ITEMS := ["stone_tool", "metal_tool"]
 # a ranged weapon fires a projectile instead of swinging.
 const WEAPON_DEFS := {
 	"":          {"label": "Fists",     "dmg": 1.0, "reach": 1.0, "time": 1.0, "kb": 1.0, "ranged": false},
-	"mallet":    {"label": "Mallet",    "dmg": 2.4, "reach": 0.95, "time": 1.8, "kb": 2.4, "ranged": false},
-	"spear":     {"label": "Spear",     "dmg": 1.5, "reach": 1.9,  "time": 1.1, "kb": 1.0, "ranged": false},
-	"slingshot": {"label": "Slingshot", "dmg": 1.3, "reach": 1.0,  "time": 1.0, "kb": 0.6, "ranged": true},
+	"mallet":    {"label": "Mallet",    "dmg": 3.0, "reach": 0.95, "time": 1.8, "kb": 2.4, "ranged": false},
+	"spear":     {"label": "Spear",     "dmg": 1.8, "reach": 1.9,  "time": 1.1, "kb": 1.0, "ranged": false},
+	"slingshot": {"label": "Slingshot", "dmg": 1.6, "reach": 1.0,  "time": 1.0, "kb": 0.6, "ranged": true},
 }
 const WEAPON_ITEMS := ["slingshot", "mallet", "spear"]
 # One-line "what it does" blurbs for the equip strip -- so tools vs weapons (and
@@ -275,9 +275,12 @@ const HURT_INVULN: float = 0.4         # grace period after a hit (no chain-stun
 const CROC_SEPARATION: float = 0.9     # crocs push apart when closer than this * 2 radii
 const CROC_PUSH_SPEED: float = 4.0 * CELL_SIZE  # max px/sec of separation push
 const MONSTER_BASE: int = 3            # monsters on night 1
-const MONSTER_PER_DAY: int = 2         # extra monsters each subsequent night
+const MONSTER_PER_DAY: float = 1.6     # extra monsters each subsequent night
 const MONSTER_CAP: int = 28
 const SPAWN_MIN_DIST: int = 11         # spawn at least this far from the player
+const FLANK_NIGHT: int = 4             # from this night on, some crocs land on the map edge
+const FLANK_FRAC: float = 0.4          # share of a raid that flanks in from the edges
+const EDGE_BAND: int = 3               # flankers spawn within this many cells of the border
 # Phase 10: the required-progression ramp. Past this night the horde + fuel burn
 # outpace hand-poured wine, so turrets must be wired to a generator (powered = no burn).
 const POWER_DEMAND_NIGHT: int = 6
@@ -286,11 +289,11 @@ const HIDE_ARMOR_STEP: float = 0.04          # armor gained per hide_armor craft
 const HIDE_ARMOR_CAP: float = 0.30           # cap on gear armor from hides
 
 # --- Per-night monster escalation --------------------------------------------
-const MON_HP_GROW: float = 1.5
+const MON_HP_GROW: float = 1.3
 const MON_ATK_GROW: float = 1.5
 const MON_SPD_GROW: float = 0.06       # +6% speed per night
 const MON_SPD_CAP: float = 2.0         # max speed multiplier
-const MON_ARM_GROW: float = 0.03
+const MON_ARM_GROW: float = 0.02
 const MON_ARM_CAP: float = 0.5
 const MON_REGEN_GROW: float = 0.3      # hp/sec gained per night past the first
 const MON_XP_BASE: int = 3             # XP for killing a night-1 croc
@@ -299,7 +302,7 @@ const MON_XP_GROW: float = 2.0         # +XP per night -- deep-night kills level
 # --- Player leveling ----------------------------------------------------------
 const HEALTH_PER_LEVEL: float = 20.0
 const ATK_PER_LEVEL: float = 1.0
-const SPD_PER_LEVEL: float = 0.03
+const SPD_PER_LEVEL: float = 0.05
 const ARMOR_PER_LEVEL: float = 0.03
 const ARMOR_CAP: float = 0.6
 const REGEN_PER_LEVEL: float = 0.3
@@ -610,6 +613,25 @@ var _shake: float = 0.0
 var _hitstop: float = 0.0          # world-freeze timer for impact punch
 var _hurt_flash: float = 0.0
 var _invuln_t: float = 0.0         # seconds of post-hit invulnerability left
+
+# --- Audio (all synthesised in code -- no asset files) ---
+const SFX_RATE: int = 22050
+const MUSIC_RATE: int = 11025
+const MUSIC_LEN: float = 16.0          # seconds per music loop
+const SFX_VOICES: int = 8
+var _sfx_vol: float = 0.8
+var _music_vol: float = 0.5
+var _muted: bool = false
+var _sfx := {}                         # name -> AudioStreamWAV
+var _sfx_players: Array = []
+var _sfx_next: int = 0
+var _sfx_last := {}                    # name -> msec of last play (throttle)
+var _music_player: AudioStreamPlayer
+var _music := {}                       # "day"/"night" -> AudioStreamWAV (built on a thread)
+var _music_thread: Thread
+var _music_want: String = "day"
+var _music_cur: String = ""
+var _music_gain: float = 0.0           # 0..1 crossfade level
 var _spark_t: float = 1.0          # >=1 inactive
 var _spark_pos: Vector2 = Vector2.ZERO
 var _poofs: Array = []             # [{pos:Vector2, t:float}, ...]
@@ -797,6 +819,8 @@ func _ready() -> void:
 	_build_ui()
 	_build_fx()
 	_build_menu_layer()
+	if not ("--selftest" in OS.get_cmdline_user_args()) and not ("--shot" in OS.get_cmdline_user_args()):
+		_audio_init()
 	_apply_daylight()
 	_update_status()
 	_refresh_context_panel()
@@ -813,6 +837,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_update_music(delta)
 	# Title / menu / settings: gameplay is paused behind the overlay.
 	if _app_state == AppState.SPLASH:
 		_tick_splash(delta)
@@ -978,6 +1003,7 @@ func _apply_daylight() -> void:
 
 func _begin_night() -> void:
 	_is_night = true
+	_play_sfx("night", 0.8, 0.0)
 	_flow_dirty = true   # new raid: rebuild paths against the latest base layout
 	# No building at night: force-exit build mode.
 	_build_mode = false
@@ -1005,6 +1031,7 @@ func _begin_night() -> void:
 
 func _begin_day() -> void:
 	_is_night = false
+	_play_sfx("dawn", 0.8, 0.0)
 	for idx in _night_snapshot:
 		if _terrain[idx] != Terrain.GRASS:
 			continue  # player built here during the night -- keep their structure
@@ -1074,7 +1101,7 @@ func _world_tick(delta: float) -> void:
 # Monsters
 # -----------------------------------------------------------------------------
 func _monster_count_for_day() -> int:
-	return mini(MONSTER_CAP, MONSTER_BASE + (_night_index() - 1) * MONSTER_PER_DAY)
+	return mini(MONSTER_CAP, MONSTER_BASE + int((_night_index() - 1) * MONSTER_PER_DAY))
 
 
 # Build a crocodile of `type` with stats scaled to night `n` (n = 1 on night one).
@@ -1125,8 +1152,11 @@ func _spawn_monsters(n: int) -> void:
 	var shore := _pool_shore.duplicate()
 	shore.shuffle()
 	var placed := 0
+	var shore_n := n
+	if night >= FLANK_NIGHT:
+		shore_n = n - int(round(n * FLANK_FRAC))   # the rest wade in from the map edges
 	for c in shore:
-		if placed >= n:
+		if placed >= shore_n:
 			break
 		if not MONSTER_WALK.has(_terrain_at(c)):
 			continue
@@ -1134,11 +1164,20 @@ func _spawn_monsters(n: int) -> void:
 		_monsters.append(_croc_for_night(_cell_center_world(c), night, type))
 		_poofs.append({"pos": _cell_center_world(c), "t": 0.2})  # a splash as it surfaces
 		placed += 1
-	# If the pool can't seat them all, the rest wade in from random far ground.
+	# Flankers (later nights) and any the pool can't seat wade in from far ground.
 	var attempts := 0
 	while placed < n and attempts < 3000:
 		attempts += 1
 		var c := Vector2i(randi() % GRID_CELLS, randi() % GRID_CELLS)
+		if night >= FLANK_NIGHT and attempts < 1500:
+			# Push the roll onto the border band so raids come from several sides.
+			var side := randi() % 4
+			var d := randi() % EDGE_BAND
+			match side:
+				0: c.x = d
+				1: c.x = GRID_CELLS - 1 - d
+				2: c.y = d
+				_: c.y = GRID_CELLS - 1 - d
 		if not MONSTER_WALK.has(_terrain_at(c)) or _chebyshev(c, _cell) < SPAWN_MIN_DIST:
 			continue
 		var type: String = pool[randi() % pool.size()]
@@ -1633,6 +1672,7 @@ func _damage_player(dmg: float, from_pos: Vector2 = Vector2.INF) -> void:
 	if _invuln_t > 0.0:
 		return   # still recovering from the last hit
 	_invuln_t = HURT_INVULN
+	_play_sfx("hurt", 1.0, 0.04)
 	_health = maxf(0.0, _health - dmg * (1.0 - _p_armor))  # armor reduces incoming damage
 	_hurt_flash = FLASH_TIME * 1.6
 	_add_shake(9.0)
@@ -1737,6 +1777,7 @@ func _fire_projectile(from: Vector2, kind: String) -> void:
 	var dir := (_player_pos - from)
 	dir = dir.normalized() if dir.length() > 1.0 else Vector2.RIGHT
 	_projectiles.append({"pos": from, "vel": dir * PROJ_SPEED, "kind": kind})
+	_play_sfx("spit", 0.5)
 
 
 func _update_projectiles(delta: float) -> void:
@@ -1958,6 +1999,7 @@ func _turret_ranged(t: Dictionary, _delta: float) -> void:
 			proj["aoefrac"] = float(def.get("aoefrac", 0.4))
 			proj["slow"] = float(def.get("slow", 1.0))
 	_projectiles.append(proj)
+	_play_sfx("shoot", 0.45)
 	t["cd"] = _turret_stat(t, "cd")
 	_turret_spend_fuel(t)
 
@@ -2189,6 +2231,9 @@ func _hurt_croc(m: Dictionary, dmg: float, kb_vec: Vector2, kb_mult: float, kill
 		log[killer] = TURRET_ASSIST_WINDOW
 	if float(m["hp"]) <= 0.0:
 		m["killer"] = killer
+		_play_sfx("croc_die", 0.9)
+	else:
+		_play_sfx("hit", 0.8)
 
 
 func _rocket_splash(center: Vector2, dmg: float, radius: float, slow: float, owner, exclude) -> void:
@@ -2362,13 +2407,18 @@ func _load_progress() -> void:
 	f.close()
 	if data is Dictionary and (data as Dictionary).has("best_nights"):
 		_best_nights = int((data as Dictionary)["best_nights"])
+	if data is Dictionary:
+		var d := data as Dictionary
+		_sfx_vol = clampf(float(d.get("sfx_vol", _sfx_vol)), 0.0, 1.0)
+		_music_vol = clampf(float(d.get("music_vol", _music_vol)), 0.0, 1.0)
+		_muted = bool(d.get("muted", false))
 
 
 func _save_progress() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		return
-	f.store_var({"best_nights": _best_nights})
+	f.store_var({"best_nights": _best_nights, "sfx_vol": _sfx_vol, "music_vol": _music_vol, "muted": _muted})
 	f.close()
 
 
@@ -2411,6 +2461,7 @@ func _gain_xp(amount: int) -> void:
 
 func _level_up() -> void:
 	_level += 1
+	_play_sfx("levelup", 0.9, 0.0)
 	_xp_to_next = _xp_needed(_level)
 	# Grant a point and freeze the action until the player chooses where it goes.
 	_stat_points += 1
@@ -2573,6 +2624,9 @@ func _input(event: InputEvent) -> void:
 		if kc == KEY_B:
 			# B toggles the Build tab (build mode is daytime-only).
 			_select_tab("help" if _build_mode else "build")
+		elif kc == KEY_M:
+			_set_muted(not _muted)
+			_set_msg("Sound off (M to turn on)" if _muted else "Sound on")
 		elif kc == KEY_E:
 			_try_eat()
 		elif kc == KEY_Q:
@@ -2674,6 +2728,7 @@ func _apply_build_at(c: Vector2i) -> void:
 			return
 		_spend(s["cost"])
 		_set_terrain(c, s["terrain"])
+		_play_sfx("build", 0.8)
 		var bidx := _cell_index(c)
 		match int(s["terrain"]):
 			Terrain.STORAGE:
@@ -2828,6 +2883,184 @@ func _spend(cost: Dictionary) -> void:
 func _refund(cost: Dictionary) -> void:
 	for k in cost:
 		_resources[k] += cost[k]
+
+
+# -----------------------------------------------------------------------------
+# Audio: procedurally synthesised sfx + two ambient music loops
+# -----------------------------------------------------------------------------
+# Render a sound to a 16-bit mono AudioStreamWAV. `wave`: 0 sine, 1 square, 2 saw,
+# 3 triangle. Pitch glides f0 -> f1; `noise` mixes in white noise; `decay` shapes
+# the envelope (higher = punchier).
+func _synth_tone(dur: float, f0: float, f1: float, wave: int, noise: float, decay: float, gain: float = 0.6) -> PackedFloat32Array:
+	var n := int(dur * SFX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase := 0.0
+	var lp := 0.0
+	for i in range(n):
+		var t := float(i) / float(n)
+		phase += lerpf(f0, f1, t) / float(SFX_RATE)
+		var ph := phase - floorf(phase)
+		var v := 0.0
+		match wave:
+			0: v = sin(ph * TAU)
+			1: v = 1.0 if ph < 0.5 else -1.0
+			2: v = ph * 2.0 - 1.0
+			_: v = absf(ph * 4.0 - 2.0) - 1.0
+		if noise > 0.0:
+			lp += (randf_range(-1.0, 1.0) - lp) * 0.35   # softened noise
+			v = v * (1.0 - noise) + lp * noise * 1.6
+		var env := pow(1.0 - t, decay) * minf(1.0, float(i) / (0.004 * SFX_RATE))
+		out[i] = v * env * gain
+	return out
+
+
+func _synth_notes(notes: Array, note_dur: float, wave: int, gain: float = 0.45) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	for f in notes:
+		out.append_array(_synth_tone(note_dur, float(f), float(f), wave, 0.0, 1.6, gain))
+	return out
+
+
+func _to_wav(data: PackedFloat32Array, rate: int, loop: bool = false) -> AudioStreamWAV:
+	var bytes := PackedByteArray()
+	bytes.resize(data.size() * 2)
+	for i in range(data.size()):
+		bytes.encode_s16(i * 2, int(clampf(data[i], -1.0, 1.0) * 32000.0))
+	var w := AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_16_BITS
+	w.mix_rate = rate
+	w.stereo = false
+	w.data = bytes
+	if loop:
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		w.loop_begin = 0
+		w.loop_end = data.size()
+	return w
+
+
+func _build_sfx() -> void:
+	_sfx["punch"] = _to_wav(_synth_tone(0.13, 420.0, 140.0, 0, 0.7, 2.2, 0.5), SFX_RATE)
+	_sfx["hit"] = _to_wav(_synth_tone(0.16, 200.0, 70.0, 3, 0.35, 2.0, 0.7), SFX_RATE)
+	_sfx["croc_die"] = _to_wav(_synth_tone(0.4, 240.0, 55.0, 2, 0.25, 1.4, 0.5), SFX_RATE)
+	_sfx["hurt"] = _to_wav(_synth_tone(0.26, 150.0, 80.0, 1, 0.4, 1.8, 0.5), SFX_RATE)
+	_sfx["build"] = _to_wav(_synth_tone(0.11, 210.0, 110.0, 3, 0.3, 2.5, 0.7), SFX_RATE)
+	_sfx["harvest"] = _to_wav(_synth_tone(0.09, 320.0, 200.0, 0, 0.85, 3.0, 0.5), SFX_RATE)
+	_sfx["shoot"] = _to_wav(_synth_tone(0.12, 900.0, 300.0, 0, 0.1, 2.0, 0.35), SFX_RATE)
+	_sfx["spit"] = _to_wav(_synth_tone(0.22, 420.0, 180.0, 1, 0.5, 1.6, 0.3), SFX_RATE)
+	_sfx["night"] = _to_wav(_synth_tone(1.5, 110.0, 68.0, 2, 0.1, 0.6, 0.5), SFX_RATE)
+	_sfx["dawn"] = _to_wav(_synth_notes([523.25, 659.25, 783.99, 1046.5], 0.22, 0, 0.45), SFX_RATE)
+	_sfx["levelup"] = _to_wav(_synth_notes([392.0, 523.25, 659.25, 784.0, 1046.5], 0.11, 3, 0.5), SFX_RATE)
+
+
+# One ambient loop: "day" = airy pentatonic plucks over a soft pad, "night" = low
+# drone with sparse cold notes. Frequencies are snapped so the loop is seamless.
+func _synth_music(kind: String) -> AudioStreamWAV:
+	var n := int(MUSIC_LEN * MUSIC_RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var snap := func(f: float) -> float: return roundf(f * MUSIC_LEN) / MUSIC_LEN
+	var pad: Array = []
+	var plucks: Array = []
+	var step := 0.5
+	if kind == "day":
+		pad = [snap.call(130.81), snap.call(196.0), snap.call(261.63)]
+		plucks = [523.25, 587.33, 659.25, 783.99, 880.0]
+	else:
+		pad = [snap.call(55.0), snap.call(82.41), snap.call(110.0)]
+		plucks = [220.0, 246.94, 329.63]
+		step = 2.0
+	var count := int(MUSIC_LEN / step)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242 if kind == "day" else 1717
+	var seq: Array = []
+	for _i in range(count):
+		seq.append(-1 if rng.randf() < (0.45 if kind == "day" else 0.4) else rng.randi() % plucks.size())
+	for i in range(n):
+		var t := float(i) / float(MUSIC_RATE)
+		var v := 0.0
+		var lfo := 0.6 + 0.4 * sin(TAU * t / MUSIC_LEN * 2.0)
+		for f in pad:
+			v += sin(TAU * float(f) * t) * (0.10 if kind == "day" else 0.16) * lfo
+		var slot := int(t / step) % count
+		var idx: int = seq[slot]
+		if idx >= 0:
+			var lt := fmod(t, step)
+			var env := exp(-lt * (5.0 if kind == "day" else 1.6)) * minf(1.0, lt * 200.0)
+			var pf: float = plucks[idx]
+			v += sin(TAU * pf * t) * env * (0.16 if kind == "day" else 0.09)
+		out[i] = v
+	return _to_wav(out, MUSIC_RATE, true)
+
+
+func _audio_init() -> void:
+	_build_sfx()
+	for _i in range(SFX_VOICES):
+		var pl := AudioStreamPlayer.new()
+		add_child(pl)
+		_sfx_players.append(pl)
+	_music_player = AudioStreamPlayer.new()
+	add_child(_music_player)
+	_music_thread = Thread.new()
+	_music_thread.start(_music_worker)   # loops take a moment to render; keep it off the main thread
+	_apply_volumes()
+
+
+func _music_worker() -> void:
+	_music["day"] = _synth_music("day")
+	_music["night"] = _synth_music("night")
+
+
+func _apply_volumes() -> void:
+	AudioServer.set_bus_mute(0, _muted)
+
+
+func _play_sfx(name: String, vol: float = 1.0, pitch_jitter: float = 0.08) -> void:
+	if _sfx_players.is_empty() or _muted or not _sfx.has(name):
+		return
+	var now := Time.get_ticks_msec()
+	if now - int(_sfx_last.get(name, -1000)) < 45:
+		return   # a swarm of turrets shouldn't machine-gun the same sample
+	_sfx_last[name] = now
+	var pl: AudioStreamPlayer = _sfx_players[_sfx_next]
+	_sfx_next = (_sfx_next + 1) % _sfx_players.size()
+	pl.stream = _sfx[name]
+	pl.volume_db = linear_to_db(maxf(0.0001, _sfx_vol * vol))
+	pl.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter)
+	pl.play()
+
+
+# Cross-fade between the day and night loops (and follow the volume slider).
+func _update_music(delta: float) -> void:
+	if _music_player == null:
+		return
+	if _music_thread != null and _music_thread.is_started() and not _music_thread.is_alive():
+		_music_thread.wait_to_finish()
+	_music_want = "night" if (_is_night and _app_state == AppState.PLAYING) else "day"
+	if not _music.has(_music_want):
+		return
+	if _music_cur != _music_want:
+		_music_gain = maxf(0.0, _music_gain - delta * 2.0)
+		if _music_gain <= 0.0:
+			_music_cur = _music_want
+			_music_player.stream = _music[_music_cur]
+			_music_player.play()
+	else:
+		_music_gain = minf(1.0, _music_gain + delta * 1.0)
+	_music_player.volume_db = linear_to_db(maxf(0.0001, _music_vol * _music_gain * 0.6))
+
+
+func _on_volume_changed(v: float, var_name: String) -> void:
+	set(var_name, v)
+	if var_name == "_sfx_vol":
+		_play_sfx("hit", 1.0)
+	_save_progress()
+
+
+func _set_muted(m: bool) -> void:
+	_muted = m
+	_apply_volumes()
+	_save_progress()
 
 
 # -----------------------------------------------------------------------------
@@ -3094,6 +3327,7 @@ func _fire_slingshot(aim_world: Vector2) -> void:
 		"pos": _player_pos + dir * PLAYER_RADIUS, "vel": dir * SLING_PROJ_SPEED,
 		"kind": "sling", "owner": "player", "dmg": dmg, "kb": float(WEAPON_DEFS["slingshot"]["kb"]),
 	})
+	_play_sfx("shoot", 0.7)
 
 
 # Spoiled matter, treated uniformly (any rotten fruit) for glue/compost recipes.
@@ -3127,6 +3361,7 @@ func _consume_fish(n: int) -> void:
 
 
 func _harvest_cell(c: Vector2i) -> void:
+	_play_sfx("harvest", 0.7)
 	var t := _terrain_at(c)
 	var idx := _cell_index(c)
 	if t == Terrain.TREE:
@@ -3182,6 +3417,7 @@ func _start_punch(aim_world: Vector2) -> void:
 	_punch_active = true
 	_punch_t = 0.0
 	_punch_hit = false
+	_play_sfx("punch", 0.8)
 
 
 # Extension 0..1: rises during the first half (extend), falls in the second (retract).
@@ -4680,6 +4916,20 @@ func _build_menu_layer() -> void:
 	fb.pressed.connect(_set_fullscreen)
 	sizes_row.add_child(fb)
 	sbox.add_child(sizes_row)
+	sbox.add_child(_spacer(14))
+	sbox.add_child(_settings_label("AUDIO  (M mutes)", 22, UI_ACCENT))
+	for row_def in [["Sound effects", "_sfx_vol"], ["Music", "_music_vol"]]:
+		var arow := HBoxContainer.new()
+		arow.alignment = BoxContainer.ALIGNMENT_CENTER
+		arow.add_theme_constant_override("separation", 10)
+		arow.add_child(_settings_label(row_def[0], 16, Color(0.9, 0.92, 0.95)))
+		var sl := HSlider.new()
+		sl.min_value = 0.0; sl.max_value = 1.0; sl.step = 0.05
+		sl.custom_minimum_size = Vector2(220, 24)
+		sl.value = float(get(row_def[1]))
+		sl.value_changed.connect(_on_volume_changed.bind(row_def[1]))
+		arow.add_child(sl)
+		sbox.add_child(arow)
 	sbox.add_child(_spacer(18))
 	sbox.add_child(_menu_button("Back", _close_settings))
 	_menu_layer.add_child(_settings_root)
@@ -7876,6 +8126,28 @@ func _run_selftest() -> void:
 	var ok_iframes2: bool = _health == hp_after_first - 10.0
 	_report("damage resumes after i-frames", ok_iframes2); fails += int(not ok_iframes2)
 	_invuln_t = 0.0
+
+	# --- Balance / audio regressions ---
+	var ok_speed: bool = CROC_SPEED < PLAYER_SPEED
+	_report("night-1 crocs are slower than the player", ok_speed); fails += int(not ok_speed)
+	_nights_survived = 4   # night 5: flankers active
+	_monsters.clear(); _cell = Vector2i(25, 25); _player_pos = _cell_center_world(_cell)
+	_spawn_monsters(20)
+	var edge_n := 0
+	for m in _monsters:
+		var mc := _world_to_cell(m["pos"])
+		if mc.x < EDGE_BAND or mc.y < EDGE_BAND or mc.x >= GRID_CELLS - EDGE_BAND or mc.y >= GRID_CELLS - EDGE_BAND:
+			edge_n += 1
+	var ok_flank: bool = _monsters.size() == 20 and edge_n >= 4
+	_report("later raids flank in from the map edges", ok_flank); fails += int(not ok_flank)
+	_monsters.clear(); _nights_survived = 0
+	_build_sfx()
+	var ok_sfx: bool = _sfx.size() >= 10 and (_sfx["hit"] as AudioStreamWAV).data.size() > 100
+	_report("sfx synthesise to non-empty streams", ok_sfx); fails += int(not ok_sfx)
+	var mus := _synth_music("night")
+	var ok_mus: bool = mus.loop_mode == AudioStreamWAV.LOOP_FORWARD and mus.data.size() == int(MUSIC_LEN * MUSIC_RATE) * 2
+	_report("music loop renders at the right length", ok_mus); fails += int(not ok_mus)
+	_sfx.clear()
 
 	_nights_survived = 0; _init_progression(); _day = 1; _resources = _default_inventory()
 

@@ -25,6 +25,7 @@ Grab a build from the [**Releases**](../../releases) page:
 | **C** | Craft menu |
 | **I** | Inventory (drop items, equip tools/weapons) |
 | **E** | Eat · **Q** | Drink |
+| **M** | Mute / unmute sound (volume sliders are in Settings) |
 
 The game opens on a title menu (**Start / Load / New Game**, **Settings**, **Quit**).
 In game, the left panel has **Save Game**, **Settings**, and **Main Menu** buttons.
