@@ -271,6 +271,9 @@ const SPARK_TIME: float = 0.18         # punch-connect spark duration
 const LOW_HP_FRAC: float = 0.35        # vignette shows below this health fraction
 const HITSTOP_HIT: float = 0.045       # brief freeze when the player lands a punch
 const HITSTOP_HURT: float = 0.075      # bigger freeze when the player gets hit
+const HURT_INVULN: float = 0.4         # grace period after a hit (no chain-stunning)
+const CROC_SEPARATION: float = 0.9     # crocs push apart when closer than this * 2 radii
+const CROC_PUSH_SPEED: float = 4.0 * CELL_SIZE  # max px/sec of separation push
 const MONSTER_BASE: int = 3            # monsters on night 1
 const MONSTER_PER_DAY: int = 2         # extra monsters each subsequent night
 const MONSTER_CAP: int = 28
@@ -606,6 +609,7 @@ var _punch_hit: bool = false       # has this punch already connected?
 var _shake: float = 0.0
 var _hitstop: float = 0.0          # world-freeze timer for impact punch
 var _hurt_flash: float = 0.0
+var _invuln_t: float = 0.0         # seconds of post-hit invulnerability left
 var _spark_t: float = 1.0          # >=1 inactive
 var _spark_pos: Vector2 = Vector2.ZERO
 var _poofs: Array = []             # [{pos:Vector2, t:float}, ...]
@@ -827,6 +831,7 @@ func _process(delta: float) -> void:
 		queue_redraw()   # keep the frozen frame (with its hit-flash) on screen
 		return
 
+	_invuln_t = maxf(0.0, _invuln_t - delta)
 	_advance_time(delta)
 	_decay_tick(delta)   # loose food spoils over time, day or night
 
@@ -1027,6 +1032,7 @@ func _begin_day() -> void:
 			_turrets[ti]["field"] = Vector2.INF
 	_punch_active = false
 	_player_kb = Vector2.ZERO
+	_invuln_t = 0.0
 	_refresh_context_panel()
 	queue_redraw()
 
@@ -1052,7 +1058,7 @@ func _world_tick(delta: float) -> void:
 					changed = true
 			Terrain.SAPLING:
 				_growth[i] += BANANA_TICK
-				if _growth[i] >= SAPLING_TIME and i != player_idx:
+				if _growth[i] >= SAPLING_TIME and i != player_idx and not _cell_overlaps_player(_index_cell(i)):
 					_terrain[i] = Terrain.TREE
 					_growth[i] = 0.0
 					changed = true
@@ -1186,7 +1192,7 @@ func _regrow_world() -> void:
 		while attempts < 60:
 			attempts += 1
 			var c := Vector2i(randi() % GRID_CELLS, randi() % GRID_CELLS)
-			if _terrain_at(c) != Terrain.GRASS or c == _cell:
+			if _terrain_at(c) != Terrain.GRASS or c == _cell or _cell_overlaps_player(c):
 				continue
 			if _near_structure(c, REGROW_STRUCT_BUFFER):
 				continue
@@ -1289,6 +1295,8 @@ func _monster_update(delta: float) -> void:
 			continue
 		_move_monster_toward(m, dir, delta, m["speed"])
 
+	_separate_monsters(delta)
+
 	# Remove dead -- but keep black crocs still owing a revive (no XP on first kill).
 	var alive := []
 	for m in _monsters:
@@ -1303,6 +1311,30 @@ func _monster_update(delta: float) -> void:
 			_poofs.append({"pos": m["pos"], "t": 0.0})
 			_add_shake(2.0)
 	_monsters = alive
+
+
+# Soft collision between crocs so a horde reads as a horde instead of one stacked
+# sprite. Burrowed diggers and downed crocs are ignored; pushes respect walls.
+func _separate_monsters(delta: float) -> void:
+	var min_d := MONSTER_RADIUS * 2.0 * CROC_SEPARATION
+	var max_push := CROC_PUSH_SPEED * delta
+	var n := _monsters.size()
+	for i in range(n):
+		var a: Dictionary = _monsters[i]
+		if a["hp"] <= 0.0 or a["dig"]:
+			continue
+		for j in range(i + 1, n):
+			var b: Dictionary = _monsters[j]
+			if b["hp"] <= 0.0 or b["dig"]:
+				continue
+			var d: Vector2 = b["pos"] - a["pos"]
+			var dl := d.length()
+			if dl >= min_d:
+				continue
+			var dir: Vector2 = d / dl if dl > 0.01 else Vector2.from_angle(float((i * 7 + j * 13) % 360) * 0.0174533)
+			var push := minf((min_d - dl) * 0.5, max_push)
+			a["pos"] = _move_collide(a["pos"], -dir * push, MONSTER_RADIUS, MONSTER_WALK)
+			b["pos"] = _move_collide(b["pos"], dir * push, MONSTER_RADIUS, MONSTER_WALK)
 
 
 # Count down the assist/debuff credit timers, dropping any that have lapsed so
@@ -1538,6 +1570,17 @@ func _update_poison_clouds(delta: float) -> void:
 	_poison_clouds = keep
 
 
+# True if any living croc's body (circle) touches cell `c`, not just its centre.
+func _monster_overlaps_cell(c: Vector2i) -> bool:
+	var r := Rect2(Vector2(c) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE))
+	for m in _monsters:
+		var p: Vector2 = m["pos"]
+		var q := Vector2(clampf(p.x, r.position.x, r.end.x), clampf(p.y, r.position.y, r.end.y))
+		if p.distance_to(q) < MONSTER_RADIUS:
+			return true
+	return false
+
+
 func _monster_at(c: Vector2i) -> int:
 	for i in range(_monsters.size()):
 		if _world_to_cell(_monsters[i]["pos"]) == c:
@@ -1587,6 +1630,9 @@ func _turret_take_damage(t: Dictionary, dmg: float) -> void:
 
 
 func _damage_player(dmg: float, from_pos: Vector2 = Vector2.INF) -> void:
+	if _invuln_t > 0.0:
+		return   # still recovering from the last hit
+	_invuln_t = HURT_INVULN
 	_health = maxf(0.0, _health - dmg * (1.0 - _p_armor))  # armor reduces incoming damage
 	_hurt_flash = FLASH_TIME * 1.6
 	_add_shake(9.0)
@@ -2437,7 +2483,8 @@ func _respawn_after_death() -> void:
 	_clear_status_effects()
 	_projectiles.clear()
 	_poison_clouds.clear()
-	_cell = Vector2i(GRID_CELLS / 2, GRID_CELLS / 2)
+	_invuln_t = 0.0
+	_cell = _nearest_walkable_cell(Vector2i(GRID_CELLS / 2, GRID_CELLS / 2))   # never inside a wall
 	_player_pos = _cell_center_world(_cell)
 	_camera.position = _player_pos
 	_time = 0.30
@@ -2462,6 +2509,7 @@ func _reset_game() -> void:
 	_weapon_equipped = ""
 	_gear_armor = 0.0
 	_lives = MAX_LIVES
+	_invuln_t = 0.0
 	_time = 0.30
 	_day = 1
 	_banana_timer = 0.0
@@ -2592,6 +2640,9 @@ func _apply_build_at(c: Vector2i) -> void:
 			return
 		var s: Dictionary = STRUCTURES[_build_struct]
 		if c == _cell or _monster_at(c) != -1:
+			return
+		if not WALKABLE.has(int(s["terrain"])) and _monster_overlaps_cell(c):
+			_set_msg("A croc is in the way.")
 			return
 		if _terrain_at(c) != Terrain.GRASS:
 			return
@@ -2786,6 +2837,8 @@ func _refund(cost: Dictionary) -> void:
 # blocking tiles. `walkset` is the set of terrains this body may stand on.
 func _move_collide(pos: Vector2, motion: Vector2, hs: float, walkset: Dictionary) -> Vector2:
 	var p := pos
+	if _box_blocked(p, hs, walkset):
+		p = _depenetrate(p, hs, walkset)   # wedged in a solid tile: pop out first
 	var nx := Vector2(p.x + motion.x, p.y)
 	if not _box_blocked(nx, hs, walkset):
 		p = nx
@@ -2793,6 +2846,33 @@ func _move_collide(pos: Vector2, motion: Vector2, hs: float, walkset: Dictionary
 	if not _box_blocked(ny, hs, walkset):
 		p = ny
 	return p
+
+
+# Nearest free spot to `pos` for a body already overlapping a solid tile (found by
+# sampling widening rings). Returns `pos` unchanged if nothing free is nearby.
+func _depenetrate(pos: Vector2, hs: float, walkset: Dictionary) -> Vector2:
+	var r := 2.0
+	while r <= CELL_SIZE * 3.0:
+		for k in range(16):
+			var ang := TAU * float(k) / 16.0
+			var cand := pos + Vector2(cos(ang), sin(ang)) * r
+			if not _box_blocked(cand, hs, walkset):
+				return cand
+		r += 2.0
+	return pos
+
+
+# Nearest cell to `from` that the player can stand on (spiral search by ring).
+func _nearest_walkable_cell(from: Vector2i) -> Vector2i:
+	for ring in range(GRID_CELLS):
+		for oy in range(-ring, ring + 1):
+			for ox in range(-ring, ring + 1):
+				if maxi(absi(ox), absi(oy)) != ring:
+					continue
+				var c := from + Vector2i(ox, oy)
+				if _in_bounds(c) and WALKABLE.has(_terrain_at(c)) and _monster_at(c) == -1:
+					return c
+	return from
 
 
 func _box_blocked(center: Vector2, hs: float, walkset: Dictionary) -> bool:
@@ -5660,7 +5740,8 @@ func _draw() -> void:
 
 	# Player: gorilla (white flash when hurt).
 	var prect := Rect2(_player_pos - cell_vec * 0.5, cell_vec)
-	draw_texture_rect(_tex_gorilla, prect, false)
+	var blink := _invuln_t > 0.0 and int(_invuln_t * 30.0) % 2 == 0
+	draw_texture_rect(_tex_gorilla, prect, false, Color(1, 1, 1, 0.45) if blink else Color.WHITE)
 	if _hurt_flash > 0.0:
 		draw_texture_rect(_tex_gorilla_flash, prect, false, Color(1, 1, 1, clampf(_hurt_flash / FLASH_TIME, 0.0, 1.0) * 0.85))
 
@@ -6331,7 +6412,7 @@ func _run_selftest() -> void:
 	_monsters = []
 	_start_punch(_player_pos + Vector2(100, 0))
 	_update_punch(PUNCH_TIME * 0.2)   # still extending
-	_damage_player(1.0, _player_pos + Vector2(10, 0))
+	_invuln_t = 0.0; _damage_player(1.0, _player_pos + Vector2(10, 0))
 	var ok_cancel: bool = not _punch_active
 	_report("getting hurt cancels an extending punch", ok_cancel); fails += int(not ok_cancel)
 
@@ -6346,7 +6427,7 @@ func _run_selftest() -> void:
 	_is_night = false
 	_lives = MAX_LIVES
 	_health = 10.0
-	_damage_player(50.0)   # death
+	_invuln_t = 0.0; _damage_player(50.0)   # death
 	var ok_life: bool = _lives == MAX_LIVES - 1 and _health == HEALTH_MAX
 	_report("death costs a life and respawns", ok_life); fails += int(not ok_life)
 
@@ -6354,7 +6435,7 @@ func _run_selftest() -> void:
 	_resources = {"wood": 9, "stone": 9, "banana": 9, "berry": 0, "rotten_banana": 0, "rotten_berry": 0}
 	_day = 5
 	_health = 10.0
-	_damage_player(50.0)   # last life -> game over reset
+	_invuln_t = 0.0; _damage_player(50.0)   # last life -> game over reset
 	var ok_over: bool = _lives == MAX_LIVES and _day == 1 and _resources["wood"] == 0
 	_report("losing last life resets to a new run", ok_over); fails += int(not ok_over)
 
@@ -6376,7 +6457,7 @@ func _run_selftest() -> void:
 	_alloc["armor"] = 10
 	_recompute_player_stats()
 	_health = _p_max_health
-	_damage_player(10.0)
+	_invuln_t = 0.0; _damage_player(10.0)
 	var ok_armor: bool = absf(_health - (_p_max_health - 10.0 * (1.0 - _p_armor))) < 0.01 and _p_armor > 0.0
 	_report("armor reduces incoming damage", ok_armor); fails += int(not ok_armor)
 
@@ -6407,7 +6488,7 @@ func _run_selftest() -> void:
 	# --- Combat juice ---
 	_shake = 0.0; _hurt_flash = 0.0; _poofs = []
 	_player_pos = _cell_center_world(Vector2i(20, 20))
-	_damage_player(5.0, _player_pos + Vector2(10, 0))
+	_invuln_t = 0.0; _damage_player(5.0, _player_pos + Vector2(10, 0))
 	var ok_feel: bool = _hurt_flash > 0.0 and _shake > 0.0
 	_report("getting hit triggers flash + shake", ok_feel); fails += int(not ok_feel)
 
@@ -6450,7 +6531,7 @@ func _run_selftest() -> void:
 
 	# Fireball burns over time.
 	_clear_status_effects(); _health = 100.0
-	_apply_fire_hit(_player_pos + Vector2(40, 0))
+	_invuln_t = 0.0; _apply_fire_hit(_player_pos + Vector2(40, 0))
 	var burn_started: bool = _burn_t > 0.0 and _health < 100.0
 	var hp_after_fire := _health
 	_update_status_effects(0.5)
@@ -6459,18 +6540,18 @@ func _run_selftest() -> void:
 
 	# Snowball slows; slow does not re-stack while already slowed.
 	_clear_status_effects(); _health = 100.0
-	_apply_snow_hit(_player_pos + Vector2(40, 0))
+	_invuln_t = 0.0; _apply_snow_hit(_player_pos + Vector2(40, 0))
 	var slow1 := _slow_t
 	_slow_t = 0.4
-	_apply_snow_hit(_player_pos + Vector2(40, 0))
+	_invuln_t = 0.0; _apply_snow_hit(_player_pos + Vector2(40, 0))
 	var ok_slow: bool = slow1 == SLOW_TIME and _slow_t == 0.4
 	_report("snowball slows (no re-stack)", ok_slow); fails += int(not ok_slow)
 
 	# Three snowballs freeze; a fourth doesn't extend the freeze.
 	_clear_status_effects(); _health = 100.0
-	_apply_snow_hit(_player_pos); _apply_snow_hit(_player_pos); _apply_snow_hit(_player_pos)
+	_invuln_t = 0.0; _apply_snow_hit(_player_pos); _apply_snow_hit(_player_pos); _apply_snow_hit(_player_pos)
 	var froze := _freeze_t
-	_apply_snow_hit(_player_pos)
+	_invuln_t = 0.0; _apply_snow_hit(_player_pos)
 	var ok_freeze: bool = froze == FREEZE_TIME and _freeze_t == FREEZE_TIME
 	_report("3 snowballs freeze (no stack)", ok_freeze); fails += int(not ok_freeze)
 
@@ -7739,6 +7820,62 @@ func _run_selftest() -> void:
 	_try_eat()
 	var ok_honey_eat: bool = _inv("honey") == 0 and _energy > 50.0
 	_report("raw honey is edible", ok_honey_eat); fails += int(not ok_honey_eat)
+
+	# --- Regression: collision / stuck-in-block fixes ---
+	# A body wedged in a solid tile is popped back out to open ground.
+	var wc := Vector2i(20, 40)
+	for dx in range(-3, 4):
+		for dy in range(-3, 4):
+			_set_terrain(wc + Vector2i(dx, dy), Terrain.GRASS)
+	_set_terrain(wc, Terrain.WOOD_WALL)
+	var stuck := _cell_center_world(wc)
+	var freed := _move_collide(stuck, Vector2(1, 0), PLAYER_RADIUS, WALKABLE)
+	var ok_depen: bool = not _box_blocked(freed, PLAYER_RADIUS, WALKABLE)
+	_report("body inside a wall is pushed out", ok_depen); fails += int(not ok_depen)
+
+	# Respawn never lands inside a structure.
+	var mid := Vector2i(GRID_CELLS / 2, GRID_CELLS / 2)
+	_set_terrain(mid, Terrain.WOOD_WALL)
+	var rc := _nearest_walkable_cell(mid)
+	var ok_resp: bool = rc != mid and WALKABLE.has(_terrain_at(rc))
+	_report("respawn cell is walkable", ok_resp); fails += int(not ok_resp)
+	_set_terrain(mid, Terrain.GRASS)
+
+	# Can't wall over a croc whose body only overlaps the cell edge.
+	var kc := Vector2i(22, 44)
+	_set_terrain(kc, Terrain.GRASS)
+	_monsters.clear()
+	_monsters.append(_mk_croc(_cell_center_world(kc) - Vector2(CELL_SIZE * 0.6, 0), 10.0))
+	_cell = Vector2i(5, 5); _player_pos = _cell_center_world(_cell)
+	_resources = _default_inventory(); _resources["wood"] = 10
+	_build_struct = "wood_wall"; _drag_action = BuildAction.BUILD
+	_apply_build_at(kc)
+	var ok_croc_block: bool = _terrain_at(kc) == Terrain.GRASS
+	_report("can't build onto an edge-overlapping croc", ok_croc_block); fails += int(not ok_croc_block)
+
+	# Stacked crocs spread apart.
+	_monsters.clear()
+	var sp := _cell_center_world(Vector2i(24, 44))
+	_monsters.append(_mk_croc(sp, 10.0)); _monsters.append(_mk_croc(sp + Vector2(1, 0), 10.0))
+	for _i in range(60):
+		_separate_monsters(1.0 / 60.0)
+	var sep_d: float = (_monsters[0]["pos"] as Vector2).distance_to(_monsters[1]["pos"])
+	var ok_sep: bool = sep_d >= MONSTER_RADIUS * 2.0 * CROC_SEPARATION - 0.5
+	_report("overlapping crocs push apart", ok_sep); fails += int(not ok_sep)
+	_monsters.clear()
+
+	# Post-hit invulnerability: a second hit inside the window is ignored.
+	_health = _p_max_health; _invuln_t = 0.0; _p_armor = 0.0
+	_damage_player(10.0)
+	var hp_after_first := _health
+	_damage_player(10.0)
+	var ok_iframes: bool = hp_after_first == _p_max_health - 10.0 and _health == hp_after_first
+	_report("i-frames ignore a second hit", ok_iframes); fails += int(not ok_iframes)
+	_invuln_t = 0.0
+	_damage_player(10.0)
+	var ok_iframes2: bool = _health == hp_after_first - 10.0
+	_report("damage resumes after i-frames", ok_iframes2); fails += int(not ok_iframes2)
+	_invuln_t = 0.0
 
 	_nights_survived = 0; _init_progression(); _day = 1; _resources = _default_inventory()
 
