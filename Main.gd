@@ -556,6 +556,7 @@ const REGROW_STRUCT_BUFFER: int = 1
 const NATURAL_BASELINE_MIN: int = 200   # fallback target if an old save lacks one
 
 # --- Colors ------------------------------------------------------------------
+const TREE_SCALE: float = 1.25          # trees are drawn this much bigger, rooted at their tile's base
 const COLOR_GRID: Color = Color(0.0, 0.0, 0.0, 0.07)
 const COLOR_PLAYER: Color = Color(1.0, 0.85, 0.1)
 const COLOR_FACE: Color = Color(0.15, 0.12, 0.0)
@@ -763,6 +764,7 @@ var _canvas_mod: CanvasModulate
 # Baked pixel-art textures
 var _tiles := {}                  # Terrain -> ImageTexture
 var _tex_gorilla: ImageTexture
+var _tree_fg := {}                # Terrain -> ImageTexture: tree art on a transparent background (depth sorting)
 var _grass_var: Array = []        # ImageTextures: plain / tufted / flowered / pebbly grass
 var _tex_glow: ImageTexture       # soft radial light sprite
 var _dmg_texts: Array = []        # [{pos:Vector2, text:String, t:float, col:Color}] floating numbers
@@ -5804,6 +5806,21 @@ func _cost_text(cost: Dictionary) -> String:
 # -----------------------------------------------------------------------------
 # Drawing (board only -- gameplay visual cues, no text)
 # -----------------------------------------------------------------------------
+func _tree_rect(x: int, y: int) -> Rect2:
+	var sz := CELL_SIZE * TREE_SCALE
+	return Rect2(Vector2(float(x) * CELL_SIZE + CELL_SIZE * 0.5 - sz * 0.5, float(y + 1) * CELL_SIZE - sz), Vector2(sz, sz))
+
+
+# One tree/palm sprite (plus its fruit overlay) in its enlarged, base-rooted rect.
+func _draw_tree(x: int, y: int) -> void:
+	var idx := y * GRID_CELLS + x
+	var t: int = _terrain[idx]
+	var r := _tree_rect(x, y)
+	draw_texture_rect(_tree_fg[t], r, false)
+	if _banana[idx] == 1:
+		draw_texture_rect(_tex_banana if t == Terrain.TREE else _tex_coconut, r, false)
+
+
 # Stable per-cell pseudo-random number (drives grass variants and tint).
 func _cell_hash(x: int, y: int) -> int:
 	var h := (x * 73856093) ^ (y * 19349663) ^ 0x5bd1e995
@@ -5873,7 +5890,8 @@ func _draw() -> void:
 		for x in range(GRID_CELLS):
 			var idx := y * GRID_CELLS + x
 			var pos := Vector2(x, y) * CELL_SIZE
-			if _terrain[idx] == Terrain.GRASS and not _grass_var.is_empty():
+			var is_tree: bool = _terrain[idx] == Terrain.TREE or _terrain[idx] == Terrain.COCONUT
+			if (_terrain[idx] == Terrain.GRASS or is_tree) and not _grass_var.is_empty():
 				var gh := _cell_hash(x, y)
 				var gvi := 0
 				var gsel := gh % 100
@@ -5881,15 +5899,13 @@ func _draw() -> void:
 				elif gsel >= 82: gvi = 4     # flower
 				elif gsel >= 66: gvi = 3     # tuft
 				else: gvi = gsel % 3         # plain
+				if is_tree:
+					gvi = gsel % 3   # plain ground under trees
 				var tint := 0.975 + float((gh >> 8) % 6) * 0.01
 				draw_texture_rect(_grass_var[gvi], Rect2(pos, cell_vec), false, Color(tint, tint, tint))
 			else:
 				draw_texture_rect(_tiles[_terrain[idx]], Rect2(pos, cell_vec), false)
-			if _terrain[idx] == Terrain.TREE and _banana[idx] == 1:
-				draw_texture_rect(_tex_banana, Rect2(pos, cell_vec), false)
-			elif _terrain[idx] == Terrain.COCONUT and _banana[idx] == 1:
-				draw_texture_rect(_tex_coconut, Rect2(pos, cell_vec), false)
-			elif _terrain[idx] == Terrain.BUSH and _berry[idx] > 0:
+			if _terrain[idx] == Terrain.BUSH and _berry[idx] > 0:
 				_draw_bush_berries(pos, _berry[idx])
 			elif _terrain[idx] == Terrain.PLANTER and _planters.has(idx) and int(_planters[idx]["berries"]) > 0:
 				_draw_bush_berries(pos, int(_planters[idx]["berries"]))
@@ -5915,6 +5931,15 @@ func _draw() -> void:
 			elif st == Terrain.WOOD_WALL or st == Terrain.STONE_WALL or st == Terrain.WORKBENCH or st == Terrain.STORAGE:
 				draw_rect(Rect2(bp, Vector2(CELL_SIZE, 4.0)), Color(0, 0, 0, 0.22))
 				draw_rect(Rect2(bp + Vector2(0, 4.0), Vector2(CELL_SIZE, 3.0)), Color(0, 0, 0, 0.10))
+
+	# Trees (pass A): drawn big and rooted at their tile base, above the ground and
+	# shadows but below characters. Characters standing behind one are covered again
+	# by pass B further down.
+	for ty in range(GRID_CELLS):
+		for tx in range(GRID_CELLS):
+			var tt0: int = _terrain[ty * GRID_CELLS + tx]
+			if tt0 == Terrain.TREE or tt0 == Terrain.COCONUT:
+				_draw_tree(tx, ty)
 
 	# Light sources cast a soft glow when it's dark (glapple lamps for now).
 	var dl := _daylight(_time)
@@ -6124,6 +6149,28 @@ func _draw() -> void:
 	if _hurt_flash > 0.0:
 		draw_texture_rect(_tex_gorilla_flash, prect, false, Color(1, 1, 1, clampf(_hurt_flash / FLASH_TIME, 0.0, 1.0) * 0.85))
 
+	# Trees (pass B): anything standing behind a tree (its feet above the trunk base)
+	# is partly hidden by the canopy, so redraw those trees over the characters.
+	var covered := {}
+	var depth_pos: Array = [_player_pos]
+	for dm in _monsters:
+		if not dm["dig"] and dm["hp"] > 0.0:
+			depth_pos.append(dm["pos"])
+	for dpos in depth_pos:
+		var dcell := _world_to_cell(dpos)
+		var drect := Rect2(dpos - cell_vec * 0.5, cell_vec)
+		for cy in range(dcell.y, dcell.y + 3):
+			for cx in range(dcell.x - 1, dcell.x + 2):
+				if not _in_bounds(Vector2i(cx, cy)):
+					continue
+				var tidx := cy * GRID_CELLS + cx
+				if covered.has(tidx) or (_terrain[tidx] != Terrain.TREE and _terrain[tidx] != Terrain.COCONUT):
+					continue
+				var tbase := float(cy + 1) * CELL_SIZE - 2.0
+				if dpos.y + CELL_SIZE * 0.3 < tbase and _tree_rect(cx, cy).intersects(drect):
+					_draw_tree(cx, cy)
+					covered[tidx] = true
+
 	# Status overlays on the player.
 	if _burn_t > 0.0:
 		for k in range(4):
@@ -6298,6 +6345,11 @@ func _bake_sprites() -> void:
 	_disc(t, 8, 5, 5, LEAF_D); _disc(t, 8, 5, 4, LEAF); _disc(t, 6, 4, 2, LEAF_L)
 	_tiles[Terrain.TREE] = _mktex(t)
 
+	var tfg := _img16()
+	_rect(tfg, 7, 8, 2, 7, TRUNK)
+	_disc(tfg, 8, 5, 5, LEAF_D); _disc(tfg, 8, 5, 4, LEAF); _disc(tfg, 6, 4, 2, LEAF_L)
+	_tree_fg[Terrain.TREE] = _mktex(tfg)
+
 	# STUMP
 	var su := _img16(); su.fill(GRASS); _speckle(su, GRASS_D, GRASS_L, 4)
 	_disc(su, 8, 9, 3, TRUNK_D); _disc(su, 8, 9, 2, TRUNK)
@@ -6408,6 +6460,12 @@ func _bake_sprites() -> void:
 		_disc(co, fr.x, fr.y, 2, LEAF_D); _px(co, fr.x, fr.y, LEAF_L)
 	_disc(co, 8, 4, 2, LEAF)
 	_tiles[Terrain.COCONUT] = _mktex(co)
+	var cfg := _img16()
+	_rect(cfg, 7, 6, 2, 9, TRUNK); _px(cfg, 8, 9, TRUNK_D); _px(cfg, 7, 12, TRUNK_D)
+	for fr2 in [Vector2i(2, 4), Vector2i(13, 4), Vector2i(4, 2), Vector2i(11, 2), Vector2i(8, 1)]:
+		_disc(cfg, fr2.x, fr2.y, 2, LEAF_D); _px(cfg, fr2.x, fr2.y, LEAF_L)
+	_disc(cfg, 8, 4, 2, LEAF)
+	_tree_fg[Terrain.COCONUT] = _mktex(cfg)
 
 	# BAMBOO (a clump of bright green canes with nodes)
 	var bm := _img16(); bm.fill(GRASS); _speckle(bm, GRASS_D, GRASS_L, 16)
@@ -8325,6 +8383,12 @@ func _run_selftest() -> void:
 	for cx in range(20, 40):
 		_set_terrain(Vector2i(cx, 45), Terrain.GRASS)
 
+	# --- Tree depth sorting ---
+	var ok_treefg: bool = _tree_fg.has(Terrain.TREE) and _tree_fg.has(Terrain.COCONUT)
+	var tr := _tree_rect(5, 5)
+	var ok_trect: bool = is_equal_approx(tr.end.y, 6.0 * CELL_SIZE) and tr.size.x > CELL_SIZE and is_equal_approx(tr.get_center().x, 5.5 * CELL_SIZE)
+	_report("tree sprites baked and base-rooted", ok_treefg and ok_trect); fails += int(not (ok_treefg and ok_trect))
+
 	# --- Visual helpers ---
 	var ok_grass: bool = _grass_var.size() == 6 and _tex_glow != null
 	_report("grass variants and glow sprite baked", ok_grass); fails += int(not ok_grass)
@@ -8441,6 +8505,14 @@ func _handle_shot_arg() -> void:
 				_monsters.append(mc)
 				i += 1
 			queue_redraw()
+		if "--depth" in args:
+			# A tree with the gorilla behind it (north) and beside it: shows the canopy covering.
+			var tc := _cell + Vector2i(2, 0)
+			_set_terrain(tc, Terrain.TREE); _banana[_cell_index(tc)] = 1
+			_set_terrain(tc + Vector2i(0, -1), Terrain.GRASS); _set_terrain(tc + Vector2i(-1, 0), Terrain.GRASS)
+			_player_pos = _cell_center_world(tc + Vector2i(0, -1)) + Vector2(0, 8)
+			_cell = _world_to_cell(_player_pos)
+			_camera.position = _player_pos
 		if "--loot" in args:
 			var li := 0
 			for lk in ["bone", "croc_hide", "wood", "stone", "glapple", "worm", "bee", "banana"]:
