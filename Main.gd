@@ -830,12 +830,16 @@ func _ready() -> void:
 	_build_ui()
 	_build_fx()
 	_build_menu_layer()
-	if not ("--selftest" in OS.get_cmdline_user_args()) and not ("--shot" in OS.get_cmdline_user_args()) and not ("--balance" in OS.get_cmdline_user_args()) and not ("--soak" in OS.get_cmdline_user_args()):
+	if not ("--selftest" in OS.get_cmdline_user_args()) and not ("--shot" in OS.get_cmdline_user_args()) and not ("--balance" in OS.get_cmdline_user_args()) and not ("--soak" in OS.get_cmdline_user_args()) and not ("--defense" in OS.get_cmdline_user_args()):
 		_audio_init()
 	_apply_daylight()
 	_update_status()
 	_refresh_context_panel()
 
+	if "--defense" in OS.get_cmdline_user_args():
+		_run_defense()
+		get_tree().quit()
+		return
 	if "--soak" in OS.get_cmdline_user_args():
 		_run_soak()
 		get_tree().quit()
@@ -1855,6 +1859,11 @@ func _update_projectiles(delta: float) -> void:
 		if p["kind"] == "arrow" or p["kind"] == "bullet" or p["kind"] == "snipe" or p["kind"] == "rocket" or p["kind"] == "sling" or p["kind"] == "peel":
 			# Friendly projectile (turret or player slingshot): hits the first croc.
 			var owner = p.get("owner", "")
+			# A turret's own tile is solid, so its shots must not count as "blocked"
+			# until they have left it.
+			var home := Vector2i(-9999, -9999)
+			if owner is int and _turrets.has(owner):
+				home = _index_cell(owner)
 			var hit = null
 			for m in _monsters:
 				if m["hp"] <= 0.0 or m["dig"]:
@@ -1873,7 +1882,7 @@ func _update_projectiles(delta: float) -> void:
 				elif p["kind"] == "peel":
 					_peels.append({"pos": np, "t": 0.0})   # leaves a slippery peel behind
 				continue
-			if _proj_blocked_cell(_world_to_cell(np)):
+			if _world_to_cell(np) != home and _proj_blocked_cell(_world_to_cell(np)):
 				if p["kind"] == "rocket":
 					_rocket_splash(np, float(p.get("dmg", 3.0)) * float(p.get("aoefrac", 0.4)), float(p.get("aoe", 1.8)) * CELL_SIZE, float(p.get("slow", 1.0)), owner, null)
 				continue
@@ -7210,6 +7219,19 @@ func _run_selftest() -> void:
 		ok_arrow = _monsters[0]["hp"] < hp0t
 	_report("turret bullet damages crocs", ok_arrow); fails += int(not ok_arrow)
 
+	# Regression: a turret's shots must actually leave the turret's own (solid) tile and
+	# hit a croc several cells away -- not just a croc placed right next to the bullet.
+	_monsters = [_mk_croc(_cell_center_world(Vector2i(13, 10)), 30.0, "green")]
+	_projectiles = []
+	_turrets[tcell]["cd"] = 0.0
+	_turret_update(0.1)
+	var far_hp: float = _monsters[0]["hp"]
+	for _f in range(90):
+		_update_projectiles(1.0 / 60.0)
+	var ok_far_hit: bool = _monsters[0]["hp"] < far_hp
+	_report("turret shots clear their own tile and hit a croc 3 cells away", ok_far_hit); fails += int(not ok_far_hit)
+	_monsters = []; _projectiles = []
+
 	# A turret keeps the XP from its own kills (no sharing with the player).
 	_monsters = [_mk_croc(_cell_center_world(Vector2i(11, 10)), 1.0, "green")]
 	_xp = 0
@@ -8539,6 +8561,76 @@ func _run_selftest() -> void:
 
 	print("SELFTEST DONE, failures=%d" % fails)
 	get_tree().quit()
+
+
+# Dev affordance: `-- --defense` plays one night per row against a sealed stone base
+# guarded by five fresh turrets (starter wine, no upgrades) with a player who just sits
+# inside and never fights. Shows how far turrets alone get you at each night.
+func _run_defense() -> void:
+	var layouts := {
+		"none": [],
+		"5 turrets": ["sniper", "mg", "rocket", "boxer", "engineer"],
+		"5 mg": ["mg", "mg", "mg", "mg", "mg"],
+	}
+	print("night | layout     | crocs killed | player dmg taken | turrets broken | avg fuel left | clear time")
+	for n in [1, 2, 3, 5, 7, 10, 15]:
+		for lname in layouts:
+			var killed_sum := 0.0
+			var total_sum := 0.0
+			var dmg_sum := 0.0
+			var broken_sum := 0.0
+			var fuel_sum := 0.0
+			var clear_sum := 0.0
+			var trials := 3
+			for trial in range(trials):
+				_seed = 500 + trial; _generate_world(); _init_progression()
+				_nights_survived = n - 1; _day = n
+				_cell = Vector2i(25, 25); _player_pos = _cell_center_world(_cell)
+				for yy in range(21, 30):   # clear the arena, then a sealed stone ring (radius 2 round the player)
+					for xx in range(21, 30):
+						_set_terrain(Vector2i(xx, yy), Terrain.GRASS)
+				for k in range(-2, 3):
+					for ring in [Vector2i(k, -2), Vector2i(k, 2), Vector2i(-2, k), Vector2i(2, k)]:
+						_set_terrain(_cell + ring, Terrain.STONE_WALL)
+				var spots := [Vector2i(-4, -4), Vector2i(4, -4), Vector2i(-4, 4), Vector2i(4, 4), Vector2i(0, -4)]
+				_turrets.clear()
+				var tl: Array = layouts[lname]
+				for i in range(tl.size()):
+					var tc: Vector2i = _cell + spots[i]
+					_set_terrain(tc, Terrain.TURRET)
+					_turrets[_cell_index(tc)] = _new_turret(tc)
+					_configure_turret(_cell_index(tc), tl[i])
+				_monsters.clear(); _projectiles.clear(); _poison_clouds.clear(); _struct_hp.clear()
+				_begin_night()
+				var spawned := _monsters.size()
+				_health = 1.0e9; _p_armor = 0.0; _invuln_t = 0.0
+				var clear_t := 60.0
+				for frame in range(60 * 60):
+					_invuln_t = maxf(0.0, _invuln_t - 1.0 / 60.0)
+					_monster_update(1.0 / 60.0)
+					_turret_update(1.0 / 60.0)
+					_trap_update(1.0 / 60.0)
+					_update_projectiles(1.0 / 60.0)
+					_update_poison_clouds(1.0 / 60.0)
+					_update_status_effects(1.0 / 60.0)
+					if _monsters.is_empty():
+						clear_t = float(frame) / 60.0
+						break
+				var tb := 0.0
+				var tf := 0.0
+				for ti in _turrets:
+					if _turrets[ti]["broken"]:
+						tb += 1.0
+					tf += float(_turrets[ti]["fuel"]) / TURRET_FUEL_MAX
+				killed_sum += float(spawned - _monsters.size())
+				total_sum += float(spawned)
+				dmg_sum += 1.0e9 - _health
+				broken_sum += tb
+				fuel_sum += (tf / float(maxi(1, _turrets.size())))
+				clear_sum += clear_t
+			print("%5d | %-10s | %5.0f / %-5.0f | %16.0f | %14.1f | %13.0f%% | %8.0fs" % [n, lname, killed_sum / trials, total_sum / trials,
+				dmg_sum / trials, broken_sum / trials, 100.0 * fuel_sum / trials, clear_sum / trials])
+	_turrets.clear(); _monsters.clear()
 
 
 # Dev affordance: `-- --soak` simulates raids against random bases (no turrets) and
