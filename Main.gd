@@ -557,6 +557,7 @@ const REGROW_STRUCT_BUFFER: int = 1
 const NATURAL_BASELINE_MIN: int = 200   # fallback target if an old save lacks one
 
 # --- Colors ------------------------------------------------------------------
+const VIEW_MARGIN: int = 3              # extra cells drawn beyond the screen edge (tall sprites, shake)
 const TREE_SCALE: float = 1.25          # trees are drawn this much bigger, rooted at their tile's base
 const COLOR_GRID: Color = Color(0.0, 0.0, 0.0, 0.07)
 const COLOR_PLAYER: Color = Color(1.0, 0.85, 0.1)
@@ -616,6 +617,7 @@ var _shake: float = 0.0
 var _hitstop: float = 0.0          # world-freeze timer for impact punch
 var _hurt_flash: float = 0.0
 var _invuln_t: float = 0.0         # seconds of post-hit invulnerability left
+var _last_draw_us: int = 0         # cost of the last world redraw (dev: --drawtime)
 var _soak_dir: Vector2 = Vector2.RIGHT   # random-walk heading used by --soak
 var _dusk_warned: bool = false     # the pre-night warning has fired this evening
 
@@ -5769,9 +5771,9 @@ func _build_help_panel() -> void:
 		_right_vbox.add_child(_label("Storage still works."))
 	else:
 		_right_vbox.add_child(_label("Gather and build by day."))
-		_right_vbox.add_child(_label("At night most of the land clears and"))
-		_right_vbox.add_child(_label("crocs hunt you -- wall"))
-		_right_vbox.add_child(_label("yourself in behind a door."))
+		_right_vbox.add_child(_label("At night most of the land"))
+		_right_vbox.add_child(_label("clears and crocs hunt you --"))
+		_right_vbox.add_child(_label("wall yourself in behind a door."))
 		_right_vbox.add_child(_label("Build turrets + spike traps to"))
 		_right_vbox.add_child(_label("let the base fight for you."))
 		_right_vbox.add_child(_label("New croc colors arrive each"))
@@ -5947,9 +5949,31 @@ func _add_dmg_text(pos: Vector2, amount: float, col: Color) -> void:
 
 
 func _draw() -> void:
+	var t_draw := Time.get_ticks_usec()
+	_draw_world()
+	_last_draw_us = Time.get_ticks_usec() - t_draw
+
+
+# The block of cells the camera can currently see (plus a margin for tall sprites).
+func _visible_cells() -> Rect2i:
+	var half := get_viewport_rect().size / (2.0 * CAMERA_ZOOM)
+	var center := _camera.position if _camera != null else _player_pos
+	var lo := Vector2i(int(floor((center.x - half.x) / CELL_SIZE)) - VIEW_MARGIN, int(floor((center.y - half.y) / CELL_SIZE)) - VIEW_MARGIN)
+	var hi := Vector2i(int(floor((center.x + half.x) / CELL_SIZE)) + VIEW_MARGIN, int(floor((center.y + half.y) / CELL_SIZE)) + VIEW_MARGIN)
+	lo = Vector2i(clampi(lo.x, 0, GRID_CELLS - 1), clampi(lo.y, 0, GRID_CELLS - 1))
+	hi = Vector2i(clampi(hi.x, 0, GRID_CELLS - 1), clampi(hi.y, 0, GRID_CELLS - 1))
+	return Rect2i(lo, hi - lo + Vector2i.ONE)
+
+
+func _draw_world() -> void:
 	var cell_vec := Vector2(CELL_SIZE, CELL_SIZE)
-	for y in range(GRID_CELLS):
-		for x in range(GRID_CELLS):
+	var vis := _visible_cells()
+	var vx0 := vis.position.x
+	var vx1 := vis.end.x
+	var vy0 := vis.position.y
+	var vy1 := vis.end.y
+	for y in range(vy0, vy1):
+		for x in range(vx0, vx1):
 			var idx := y * GRID_CELLS + x
 			var pos := Vector2(x, y) * CELL_SIZE
 			var is_tree: bool = _terrain[idx] == Terrain.TREE or _terrain[idx] == Terrain.COCONUT
@@ -5978,8 +6002,8 @@ func _draw() -> void:
 
 	# Grounding: tall things cast a soft shadow onto the tile below them, and solid
 	# blocks get a dark lip along their lower edge.
-	for y in range(GRID_CELLS - 1):
-		for x in range(GRID_CELLS):
+	for y in range(vy0, mini(vy1, GRID_CELLS - 1)):
+		for x in range(vx0, vx1):
 			var sidx := y * GRID_CELLS + x
 			var st: int = _terrain[sidx]
 			var below: int = _terrain[sidx + GRID_CELLS]
@@ -5997,8 +6021,8 @@ func _draw() -> void:
 	# Trees (pass A): drawn big and rooted at their tile base, above the ground and
 	# shadows but below characters. Characters standing behind one are covered again
 	# by pass B further down.
-	for ty in range(GRID_CELLS):
-		for tx in range(GRID_CELLS):
+	for ty in range(vy0, vy1):
+		for tx in range(vx0, vx1):
 			var tt0: int = _terrain[ty * GRID_CELLS + tx]
 			if tt0 == Terrain.TREE or tt0 == Terrain.COCONUT:
 				_draw_tree(tx, ty)
@@ -6013,11 +6037,12 @@ func _draw() -> void:
 			var lc: Color = ls["color"]
 			draw_texture_rect(_tex_glow, Rect2(lp - Vector2(lr, lr), Vector2(lr, lr) * 2.0), false, Color(lc.r, lc.g, lc.b, 0.55 * night_amt))
 
-	var side := float(GRID_CELLS) * CELL_SIZE
-	for i in range(GRID_CELLS + 1):
+	for i in range(vx0, vx1 + 1):
 		var off := float(i) * CELL_SIZE
-		draw_line(Vector2(off, 0.0), Vector2(off, side), COLOR_GRID, 1.0)
-		draw_line(Vector2(0.0, off), Vector2(side, off), COLOR_GRID, 1.0)
+		draw_line(Vector2(off, float(vy0) * CELL_SIZE), Vector2(off, float(vy1) * CELL_SIZE), COLOR_GRID, 1.0)
+	for i in range(vy0, vy1 + 1):
+		var off := float(i) * CELL_SIZE
+		draw_line(Vector2(float(vx0) * CELL_SIZE, off), Vector2(float(vx1) * CELL_SIZE, off), COLOR_GRID, 1.0)
 
 	if _build_mode:
 		if _in_bounds(_hover_cell) and _mouse_in_board():
@@ -8473,6 +8498,16 @@ func _run_selftest() -> void:
 	_report("a crowd of 24 stacked crocs starts spreading", ok_crowd); fails += int(not ok_crowd)
 	_monsters.clear()
 
+	# --- View culling ---
+	_camera.position = _cell_center_world(Vector2i(25, 25))
+	var vis_c := _visible_cells()
+	var ok_cull: bool = vis_c.has_point(Vector2i(25, 25)) and vis_c.size.x < GRID_CELLS and vis_c.size.y <= GRID_CELLS
+	_camera.position = _cell_center_world(Vector2i(0, 0))
+	var vis_edge := _visible_cells()
+	var ok_cull2: bool = vis_edge.position == Vector2i(0, 0) and vis_edge.end.x <= GRID_CELLS and vis_edge.end.y <= GRID_CELLS
+	_camera.position = _player_pos
+	_report("only on-screen cells are drawn (clamped at the map edge)", ok_cull and ok_cull2); fails += int(not (ok_cull and ok_cull2))
+
 	# --- Dusk warning ---
 	_is_night = false; _dusk_warned = false; _time = DUSK_WARN_AT - 0.001; _msg_timer = 0.0; _msg = ""
 	_advance_time(0.01 * DAY_LENGTH)
@@ -8702,6 +8737,8 @@ func _handle_shot_arg() -> void:
 			_player_pos = _cell_center_world(tc + Vector2i(0, -1)) + Vector2(0, 8)
 			_cell = _world_to_cell(_player_pos)
 			_camera.position = _player_pos
+		if "--corner" in args:
+			_cell = Vector2i(1, 1); _player_pos = _cell_center_world(_cell); _camera.position = _player_pos
 		if "--loot" in args:
 			var li := 0
 			for lk in ["bone", "croc_hide", "wood", "stone", "glapple", "worm", "bee", "banana"]:
@@ -8801,5 +8838,7 @@ func _handle_shot_arg() -> void:
 			_enter_menu(); _menu_new_game()
 		for _i in range(3):
 			await RenderingServer.frame_post_draw
+		if "--drawtime" in args:
+			print("DRAWTIME us: ", _last_draw_us)
 		get_viewport().get_texture().get_image().save_png(path)
 		get_tree().quit()
