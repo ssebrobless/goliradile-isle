@@ -55,5 +55,6 @@ godot --headless --path . -- --selftest
 Other dev flags: `-- --balance` prints how raids scale per night; `-- --soak [--runs=N --secs=S]`
 simulates raids against random bases and reports stuck crocs; `-- --shot out.png --demo --drawtime`
 prints the cost of one world redraw.
+`-- --defense` plays nights against a sealed base guarded by fresh turrets and a passive player.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
