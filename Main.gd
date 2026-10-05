@@ -279,6 +279,7 @@ const MONSTER_PER_DAY: float = 1.6     # extra monsters each subsequent night
 const MONSTER_CAP: int = 28
 const SPAWN_MIN_DIST: int = 11         # spawn at least this far from the player
 const COVER_PCT: int = 30              # % of trees/rocks that stay standing at night as cover
+const DUSK_WARN_AT: float = 0.79        # time-of-day fraction when the "night is coming" warning fires (~10s before dark)
 const FLANK_NIGHT: int = 4             # from this night on, some crocs land on the map edge
 const FLANK_FRAC: float = 0.4          # share of a raid that flanks in from the edges
 const EDGE_BAND: int = 3               # flankers spawn within this many cells of the border
@@ -292,8 +293,8 @@ const HIDE_ARMOR_CAP: float = 0.30           # cap on gear armor from hides
 # --- Per-night monster escalation --------------------------------------------
 const MON_HP_GROW: float = 1.3
 const MON_ATK_GROW: float = 1.5
-const MON_SPD_GROW: float = 0.06       # +6% speed per night
-const MON_SPD_CAP: float = 2.0         # max speed multiplier
+const MON_SPD_GROW: float = 0.04       # +4% speed per night
+const MON_SPD_CAP: float = 1.6         # max speed multiplier
 const MON_ARM_GROW: float = 0.02
 const MON_ARM_CAP: float = 0.5
 const MON_REGEN_GROW: float = 0.3      # hp/sec gained per night past the first
@@ -615,6 +616,7 @@ var _shake: float = 0.0
 var _hitstop: float = 0.0          # world-freeze timer for impact punch
 var _hurt_flash: float = 0.0
 var _invuln_t: float = 0.0         # seconds of post-hit invulnerability left
+var _dusk_warned: bool = false     # the pre-night warning has fired this evening
 
 # --- Audio (all synthesised in code -- no asset files) ---
 const SFX_RATE: int = 22050
@@ -825,12 +827,16 @@ func _ready() -> void:
 	_build_ui()
 	_build_fx()
 	_build_menu_layer()
-	if not ("--selftest" in OS.get_cmdline_user_args()) and not ("--shot" in OS.get_cmdline_user_args()):
+	if not ("--selftest" in OS.get_cmdline_user_args()) and not ("--shot" in OS.get_cmdline_user_args()) and not ("--balance" in OS.get_cmdline_user_args()):
 		_audio_init()
 	_apply_daylight()
 	_update_status()
 	_refresh_context_panel()
 
+	if "--balance" in OS.get_cmdline_user_args():
+		_print_balance_table()
+		get_tree().quit()
+		return
 	if "--selftest" in OS.get_cmdline_user_args():
 		_run_selftest()
 		return
@@ -970,6 +976,11 @@ func _advance_time(delta: float) -> void:
 			_save_progress()
 		_begin_day()
 
+	if not _is_night and not _dusk_warned and _time >= DUSK_WARN_AT and _time < 0.855:
+		_dusk_warned = true
+		_play_sfx("dusk", 0.9, 0.0)
+		_set_msg("Dusk -- night %d is coming: %d crocs. Get inside!" % [_night_index(), _monster_count_for_day()])
+
 	var drain := ENERGY_DRAIN + (1.0 - _daylight(_time)) * ENERGY_NIGHT_EXTRA
 	_energy = maxf(0.0, _energy - drain * delta)
 	_hydration = maxf(0.0, _hydration - HYDRATION_DRAIN * delta)
@@ -1020,6 +1031,7 @@ func _night_cover(i: int, t: int) -> bool:
 
 func _begin_night() -> void:
 	_is_night = true
+	_dusk_warned = true
 	_play_sfx("night", 0.8, 0.0)
 	_flow_dirty = true   # new raid: rebuild paths against the latest base layout
 	# No building at night: force-exit build mode.
@@ -1050,6 +1062,7 @@ func _begin_night() -> void:
 
 func _begin_day() -> void:
 	_is_night = false
+	_dusk_warned = false
 	_play_sfx("dawn", 0.8, 0.0)
 	for idx in _night_snapshot:
 		if _terrain[idx] != Terrain.GRASS:
@@ -2650,9 +2663,15 @@ func _input(event: InputEvent) -> void:
 			_set_muted(not _muted)
 			_set_msg("Sound off (M to turn on)" if _muted else "Sound on")
 		elif kc == KEY_E:
+			var before_e := _energy + _health
 			_try_eat()
+			if _energy + _health > before_e + 0.01:
+				_play_sfx("eat", 0.8)
 		elif kc == KEY_Q:
+			var before_h := _hydration
 			_drink_best()
+			if _hydration > before_h + 0.01:
+				_play_sfx("drink", 0.8)
 		elif kc == KEY_I:
 			_select_tab("help" if _inv_open else "items")
 		elif kc == KEY_C:
@@ -2972,6 +2991,9 @@ func _build_sfx() -> void:
 	_sfx["spit"] = _to_wav(_synth_tone(0.22, 420.0, 180.0, 1, 0.5, 1.6, 0.3), SFX_RATE)
 	_sfx["night"] = _to_wav(_synth_tone(1.5, 110.0, 68.0, 2, 0.1, 0.6, 0.5), SFX_RATE)
 	_sfx["dawn"] = _to_wav(_synth_notes([523.25, 659.25, 783.99, 1046.5], 0.22, 0, 0.45), SFX_RATE)
+	_sfx["dusk"] = _to_wav(_synth_notes([392.0, 329.63, 261.63], 0.35, 0, 0.5), SFX_RATE)   # low descending bell
+	_sfx["eat"] = _to_wav(_synth_tone(0.14, 260.0, 160.0, 3, 0.8, 2.0, 0.5), SFX_RATE)
+	_sfx["drink"] = _to_wav(_synth_tone(0.22, 500.0, 900.0, 0, 0.0, 1.2, 0.35), SFX_RATE)
 	_sfx["levelup"] = _to_wav(_synth_notes([392.0, 523.25, 659.25, 784.0, 1046.5], 0.11, 3, 0.5), SFX_RATE)
 
 
@@ -3026,6 +3048,11 @@ func _audio_init() -> void:
 	_music_thread = Thread.new()
 	_music_thread.start(_music_worker)   # loops take a moment to render; keep it off the main thread
 	_apply_volumes()
+
+
+func _exit_tree() -> void:
+	if _music_thread != null and _music_thread.is_started():
+		_music_thread.wait_to_finish()   # don't tear down mid-render
 
 
 func _music_worker() -> void:
@@ -8383,6 +8410,16 @@ func _run_selftest() -> void:
 	for cx in range(20, 40):
 		_set_terrain(Vector2i(cx, 45), Terrain.GRASS)
 
+	# --- Dusk warning ---
+	_is_night = false; _dusk_warned = false; _time = DUSK_WARN_AT - 0.001; _msg_timer = 0.0; _msg = ""
+	_advance_time(0.01 * DAY_LENGTH)
+	var ok_dusk: bool = _dusk_warned and _msg.begins_with("Dusk")
+	_report("dusk warning fires before night", ok_dusk); fails += int(not ok_dusk)
+	_msg = ""; _advance_time(0.1)
+	var ok_dusk1: bool = _msg == ""   # fires once per evening
+	_report("dusk warning only fires once", ok_dusk1); fails += int(not ok_dusk1)
+	_time = 0.30; _dusk_warned = false; _is_night = false
+
 	# --- Tree depth sorting ---
 	var ok_treefg: bool = _tree_fg.has(Terrain.TREE) and _tree_fg.has(Terrain.COCONUT)
 	var tr := _tree_rect(5, 5)
@@ -8404,6 +8441,19 @@ func _run_selftest() -> void:
 
 	print("SELFTEST DONE, failures=%d" % fails)
 	get_tree().quit()
+
+
+# Dev affordance: `-- --balance` prints how a night's raid scales, next to the player.
+func _print_balance_table() -> void:
+	print("night crocs | green hp  atk  armor  speed(x player) | yellow speed | raid hp total")
+	for n in [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30]:
+		_nights_survived = n - 1
+		var g := _croc_for_night(Vector2.ZERO, n, "green")
+		var y := _croc_for_night(Vector2.ZERO, n, "yellow")
+		var cnt := _monster_count_for_day()
+		print("%5d %5d | %8.1f %5.1f %5.2f %8.2f | %10.2f | %8.0f" % [n, cnt, g["max_hp"], g["attack"], g["armor"],
+			float(g["speed"]) / PLAYER_SPEED, float(y["speed"]) / PLAYER_SPEED, g["max_hp"] * cnt])
+	_nights_survived = 0
 
 
 func _report(name: String, ok: bool) -> void:
