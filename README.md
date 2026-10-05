@@ -52,4 +52,7 @@ Open the project in Godot 4.6.x and run `Main.tscn`, or export via the included
 godot --headless --path . -- --selftest
 ```
 
+Other dev flags: `-- --balance` prints how raids scale per night; `-- --soak [--runs=N --secs=S]`
+simulates raids against random bases and reports stuck crocs.
+
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

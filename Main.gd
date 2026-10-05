@@ -616,6 +616,7 @@ var _shake: float = 0.0
 var _hitstop: float = 0.0          # world-freeze timer for impact punch
 var _hurt_flash: float = 0.0
 var _invuln_t: float = 0.0         # seconds of post-hit invulnerability left
+var _soak_dir: Vector2 = Vector2.RIGHT   # random-walk heading used by --soak
 var _dusk_warned: bool = false     # the pre-night warning has fired this evening
 
 # --- Audio (all synthesised in code -- no asset files) ---
@@ -827,12 +828,16 @@ func _ready() -> void:
 	_build_ui()
 	_build_fx()
 	_build_menu_layer()
-	if not ("--selftest" in OS.get_cmdline_user_args()) and not ("--shot" in OS.get_cmdline_user_args()) and not ("--balance" in OS.get_cmdline_user_args()):
+	if not ("--selftest" in OS.get_cmdline_user_args()) and not ("--shot" in OS.get_cmdline_user_args()) and not ("--balance" in OS.get_cmdline_user_args()) and not ("--soak" in OS.get_cmdline_user_args()):
 		_audio_init()
 	_apply_daylight()
 	_update_status()
 	_refresh_context_panel()
 
+	if "--soak" in OS.get_cmdline_user_args():
+		_run_soak()
+		get_tree().quit()
+		return
 	if "--balance" in OS.get_cmdline_user_args():
 		_print_balance_table()
 		get_tree().quit()
@@ -1390,6 +1395,11 @@ func _separate_monsters(delta: float) -> void:
 	var min_d := MONSTER_RADIUS * 2.0 * CROC_SEPARATION
 	var max_push := CROC_PUSH_SPEED * delta
 	var n := _monsters.size()
+	var push_acc: Array = []
+	push_acc.resize(n)
+	var any_push := false
+	for i in range(n):
+		push_acc[i] = Vector2.ZERO
 	for i in range(n):
 		var a: Dictionary = _monsters[i]
 		if a["hp"] <= 0.0 or a["dig"]:
@@ -1404,8 +1414,18 @@ func _separate_monsters(delta: float) -> void:
 				continue
 			var dir: Vector2 = d / dl if dl > 0.01 else Vector2.from_angle(float((i * 7 + j * 13) % 360) * 0.0174533)
 			var push := minf((min_d - dl) * 0.5, max_push)
-			a["pos"] = _move_collide(a["pos"], -dir * push, MONSTER_RADIUS, MONSTER_WALK)
-			b["pos"] = _move_collide(b["pos"], dir * push, MONSTER_RADIUS, MONSTER_WALK)
+			push_acc[i] -= dir * push
+			push_acc[j] += dir * push
+			any_push = true
+	if not any_push:
+		return
+	for i in range(n):   # one collision-checked move per croc, however crowded it is
+		var pv: Vector2 = push_acc[i]
+		if pv == Vector2.ZERO:
+			continue
+		if pv.length() > max_push:
+			pv = pv.normalized() * max_push
+		_monsters[i]["pos"] = _move_collide(_monsters[i]["pos"], pv, MONSTER_RADIUS, MONSTER_WALK)
 
 
 # Count down the assist/debuff credit timers, dropping any that have lapsed so
@@ -1494,11 +1514,12 @@ func _build_flow_field() -> void:
 	_flow_dirty = false
 
 
-# Direction down the flow gradient from `from`, or ZERO if no open route exists
-# (caller then falls back to straight-line chase, which lets it chew a wall).
-func _flow_dir(from: Vector2i) -> Vector2:
+# The next cell down the flow gradient from `from`, or `from` itself if there is no
+# better neighbour (caller then falls back to straight-line chase, which lets it
+# chew a wall).
+func _flow_next_cell(from: Vector2i) -> Vector2i:
 	if _flow_dist.size() != GRID_CELLS * GRID_CELLS or not _in_bounds(from):
-		return Vector2.ZERO
+		return from
 	var here: int = _flow_dist[_cell_index(from)]
 	var best: int = here if here >= 0 else 0x3FFFFFFF
 	var best_cell := from
@@ -1516,18 +1537,30 @@ func _flow_dir(from: Vector2i) -> Vector2:
 				continue
 		best = nd
 		best_cell = nb
-	if best_cell == from:
+	return best_cell
+
+
+# Direction down the flow gradient from `from`, or ZERO if no open route exists.
+func _flow_dir(from: Vector2i) -> Vector2:
+	var nxt := _flow_next_cell(from)
+	if nxt == from:
 		return Vector2.ZERO
-	return (Vector2(best_cell) - Vector2(from)).normalized()
+	return (Vector2(nxt) - Vector2(from)).normalized()
 
 
 # Move a monster toward `dir`; follows the flow field when one exists (routing
 # around buildings), else straight -- and if blocked by a structure, chews through.
 func _move_monster_toward(m: Dictionary, dir: Vector2, delta: float, speed: float, use_flow: bool = true) -> void:
 	if use_flow:
-		var fdir := _flow_dir(_world_to_cell(m["pos"]))
-		if fdir != Vector2.ZERO:
-			dir = fdir
+		# Steer at the centre of the next cell on the route (not just its compass
+		# direction) so a croc that has drifted against a wall or the shoreline is
+		# pulled back onto the cell's centre line instead of grinding along the edge.
+		var fcell := _world_to_cell(m["pos"])
+		var fnext := _flow_next_cell(fcell)
+		if fnext != fcell:
+			var to_next: Vector2 = _cell_center_world(fnext) - (m["pos"] as Vector2)
+			if to_next.length() > 0.5:
+				dir = to_next.normalized()
 	if m["slow_t"] > 0.0:
 		speed *= 0.5   # slowed by a spike trap / rocket
 	speed *= _adhesive_factor(m["pos"])   # adhesive support-turret slow field
@@ -5845,7 +5878,9 @@ func _draw_tree(x: int, y: int) -> void:
 	var r := _tree_rect(x, y)
 	draw_texture_rect(_tree_fg[t], r, false)
 	if _banana[idx] == 1:
-		draw_texture_rect(_tex_banana if t == Terrain.TREE else _tex_coconut, r, false)
+		# Fruit sits inside the canopy at 80% size so it doesn't swamp the bigger tree.
+		var fr := Rect2(r.position + r.size * 0.1 + Vector2(0, r.size.y * 0.02), r.size * 0.8)
+		draw_texture_rect(_tex_banana if t == Terrain.TREE else _tex_coconut, fr, false)
 
 
 # Stable per-cell pseudo-random number (drives grass variants and tint).
@@ -6027,13 +6062,6 @@ func _draw() -> void:
 		if m["flash"] > 0.0:
 			var fa: float = clampf(m["flash"] / FLASH_TIME, 0.0, 1.0)
 			draw_texture_rect(tex["fl"] if left else tex["fr"], rect, false, Color(1, 1, 1, fa))
-		# Health bar once a croc has taken damage.
-		if m["hp"] > 0.0 and m["hp"] < m["max_hp"]:
-			var hbw := CELL_SIZE * 0.7
-			var hbp := mp + Vector2(-hbw * 0.5, -CELL_SIZE * 0.52)
-			var hfrac := clampf(float(m["hp"]) / float(m["max_hp"]), 0.0, 1.0)
-			draw_rect(Rect2(hbp - Vector2(1, 1), Vector2(hbw + 2, 5)), Color(0, 0, 0, 0.65))
-			draw_rect(Rect2(hbp, Vector2(hbw * hfrac, 3)), Color(0.35, 0.85, 0.35).lerp(Color(0.9, 0.25, 0.2), 1.0 - hfrac))
 
 	# Green "+" over crocs currently being mended by a white croc.
 	for m in _monsters:
@@ -6197,6 +6225,15 @@ func _draw() -> void:
 				if dpos.y + CELL_SIZE * 0.3 < tbase and _tree_rect(cx, cy).intersects(drect):
 					_draw_tree(cx, cy)
 					covered[tidx] = true
+
+	# Croc health bars (drawn after the tree pass so canopies never hide them).
+	for hm in _monsters:
+		if hm["hp"] > 0.0 and hm["hp"] < hm["max_hp"] and not hm["dig"]:
+			var hbw := CELL_SIZE * 0.7
+			var hbp: Vector2 = (hm["pos"] as Vector2) + Vector2(-hbw * 0.5, -CELL_SIZE * 0.6)
+			var hfrac := clampf(float(hm["hp"]) / float(hm["max_hp"]), 0.0, 1.0)
+			draw_rect(Rect2(hbp - Vector2(1, 1), Vector2(hbw + 2, 5)), Color(0, 0, 0, 0.65))
+			draw_rect(Rect2(hbp, Vector2(hbw * hfrac, 3)), Color(0.35, 0.85, 0.35).lerp(Color(0.9, 0.25, 0.2), 1.0 - hfrac))
 
 	# Status overlays on the player.
 	if _burn_t > 0.0:
@@ -8410,6 +8447,32 @@ func _run_selftest() -> void:
 	for cx in range(20, 40):
 		_set_terrain(Vector2i(cx, 45), Terrain.GRASS)
 
+	# --- Croc steering: pulled back onto the route's centre line, not ground along an edge ---
+	for xx in range(5, 20):
+		for yy in range(8, 13):
+			_set_terrain(Vector2i(xx, yy), Terrain.GRASS)
+	_monsters.clear()
+	_cell = Vector2i(18, 10); _player_pos = _cell_center_world(_cell)
+	_flow_dirty = true; _build_flow_field()
+	var steer := _mk_croc(_cell_center_world(Vector2i(6, 10)) + Vector2(0, 12), 10.0)
+	for _i in range(40):
+		_move_monster_toward(steer, Vector2.RIGHT, 1.0 / 60.0, CROC_SPEED)
+	var off_line: float = absf((steer["pos"] as Vector2).y - _cell_center_world(Vector2i(6, 10)).y)
+	var ok_steer: bool = off_line < 6.0 and (steer["pos"] as Vector2).x > _cell_center_world(Vector2i(6, 10)).x + 20.0
+	_report("croc steering recentres on the route", ok_steer); fails += int(not ok_steer)
+
+	# Separation stays cheap in a crowd: one collision move per croc.
+	_monsters.clear()
+	for k in range(24):
+		_monsters.append(_mk_croc(_cell_center_world(Vector2i(10, 10)) + Vector2(float(k % 3), float(k % 2)), 10.0))
+	_separate_monsters(1.0 / 60.0)
+	var spread := 0.0
+	for m in _monsters:
+		spread = maxf(spread, (m["pos"] as Vector2).distance_to(_cell_center_world(Vector2i(10, 10))))
+	var ok_crowd: bool = spread > 0.5
+	_report("a crowd of 24 stacked crocs starts spreading", ok_crowd); fails += int(not ok_crowd)
+	_monsters.clear()
+
 	# --- Dusk warning ---
 	_is_night = false; _dusk_warned = false; _time = DUSK_WARN_AT - 0.001; _msg_timer = 0.0; _msg = ""
 	_advance_time(0.01 * DAY_LENGTH)
@@ -8441,6 +8504,82 @@ func _run_selftest() -> void:
 
 	print("SELFTEST DONE, failures=%d" % fails)
 	get_tree().quit()
+
+
+# Dev affordance: `-- --soak` simulates raids against random bases (no turrets) and
+# reports crocs that sit wedged in solid tiles or stop moving with a free route,
+# and whether a randomly walking player ever ends up inside a solid tile.
+func _run_soak() -> void:
+	var rng := RandomNumberGenerator.new()
+	var wedged := 0
+	var stalled := 0
+	var player_wedged := 0
+	var runs := 0
+	var soak_runs := 12
+	var soak_secs := 40
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--runs="): soak_runs = int(arg.substr(7))
+		if arg.begins_with("--secs="): soak_secs = int(arg.substr(7))
+	var t_prof := {"update": 0}   # microseconds spent in _monster_update
+	for seed_i in range(soak_runs):
+		rng.seed = 100 + seed_i
+		_seed = 100 + seed_i
+		_generate_world(); _init_progression()
+		_nights_survived = [0, 2, 4, 6, 8, 10][seed_i % 6]
+		_day = 1 + _nights_survived
+		_cell = Vector2i(25, 25)
+		_player_pos = _cell_center_world(_cell)
+		for _i in range(rng.randi_range(25, 60)):   # a random walled base around the player
+			var c := _cell + Vector2i(rng.randi_range(-7, 7), rng.randi_range(-7, 7))
+			if c != _cell and _in_bounds(c) and _terrain_at(c) == Terrain.GRASS:
+				_set_terrain(c, [Terrain.WOOD_WALL, Terrain.STONE_WALL, Terrain.DOOR][rng.randi() % 3])
+		_monsters.clear(); _projectiles.clear(); _poison_clouds.clear()
+		_begin_night()
+		var last_pos := {}
+		var still_t := {}
+		for frame in range(60 * soak_secs):
+			_health = _p_max_health   # we're testing movement, not survival
+			_invuln_t = 0.0
+			if frame % 90 == 0:
+				var dirv := Vector2.from_angle(rng.randf() * TAU)
+				_soak_dir = dirv
+			_player_pos = _move_collide(_player_pos, _soak_dir * _p_speed * (1.0 / 60.0), PLAYER_RADIUS, WALKABLE)
+			_cell = _world_to_cell(_player_pos)
+			var t0 := Time.get_ticks_usec()
+			_monster_update(1.0 / 60.0)
+			t_prof["update"] += Time.get_ticks_usec() - t0
+			if frame % 60 == 59:
+				for mi in range(_monsters.size()):
+					var m: Dictionary = _monsters[mi]
+					if m["hp"] <= 0.0 or m["dig"]:
+						continue
+					var pos: Vector2 = m["pos"]
+					if _box_blocked(pos, MONSTER_RADIUS, MONSTER_WALK):
+						wedged += 1
+						print("  croc in solid: %s role %s cell %s terrain %d pos %s hp %.1f dig %s kb %s seed %d frame %d" % [
+							m["type"], m["role"], _world_to_cell(pos), _terrain_at(_world_to_cell(pos)), pos, m["hp"], m["dig"], m["kb"], 100 + seed_i, frame])
+					var key := mi
+					if last_pos.has(key) and (last_pos[key] as Vector2).distance_to(pos) < 2.0 \
+							and pos.distance_to(_player_pos) > ATTACK_RANGE * 2.0 and m["role"] == "melee" \
+							and _flow_dist.size() > 0 and _flow_dist[_cell_index(_world_to_cell(pos))] >= 0 \
+							and float(m.get("stun_t", 0.0)) <= 0.0:
+						still_t[key] = int(still_t.get(key, 0)) + 1
+						if int(still_t[key]) == 4:   # four seconds frozen with a clear route
+							stalled += 1
+							var sc := _world_to_cell(pos)
+							var nb_dbg := []
+							for off in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+								nb_dbg.append(_terrain_at(sc + off))
+							print("  stalled %s croc at cell %s pos %s player %s seed %d flowdir %s kb %s slow %s nbrs(N,E,S,W) %s" % [
+								m["type"], sc, pos, _cell, 100 + seed_i, _flow_dir(sc), m["kb"], m["slow_t"], nb_dbg])
+					else:
+						still_t[key] = 0
+					last_pos[key] = pos
+		if _box_blocked(_player_pos, PLAYER_RADIUS, WALKABLE):
+			player_wedged += 1
+		runs += 1
+	print("SOAK profile: _monster_update avg %.2f ms/frame" % (float(t_prof["update"]) / 1000.0 / float(maxi(1, soak_runs * soak_secs * 60))))
+	print("SOAK runs=%d croc-in-solid=%d stalled-with-route=%d player-in-solid=%d" % [runs, wedged, stalled, player_wedged])
 
 
 # Dev affordance: `-- --balance` prints how a night's raid scales, next to the player.
