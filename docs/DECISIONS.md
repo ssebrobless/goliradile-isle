@@ -4,6 +4,15 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Planning docs written after round 10
+
+At the owner's request, three more planning documents were drafted: `ARCHITECTURE.md` (target
+code structure, core types, fixed timestep, save v2 layout, large-world design, testing and CI,
+migration strategy, and an 18-task Phase 0 breakdown with acceptance tests), `BOSSES.md` (shared
+boss rules and a sheet for each of the 10 bosses, plus the `--bossfight` test scenarios) and
+`PHASES_1_2.md` (27 PR-sized tasks with tests and two playtest checklists). All are drafts for
+review; Phase 0 has **not** been started (owner: more planning first).
+
 ## Round 10 (audit of the docs)
 
 | ID | Question | Decision | Implication |

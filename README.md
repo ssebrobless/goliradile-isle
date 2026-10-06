@@ -49,7 +49,9 @@ See [`docs/DESIGN.md`](docs/DESIGN.md) for the vision (bosses, difficulties, tow
 automation, co-op) and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the phased plan to launch.
 Supporting docs: [`DECISIONS`](docs/DECISIONS.md) (choices made), [`PROGRESSION`](docs/PROGRESSION.md)
 (tiers and pacing), [`TOWERS`](docs/TOWERS.md), [`PLAYER`](docs/PLAYER.md) (power, gear, perks,
-meals), [`ASSETS`](docs/ASSETS.md) (art and audio licences).
+meals), [`ASSETS`](docs/ASSETS.md) (art and audio licences), [`ARCHITECTURE`](docs/ARCHITECTURE.md)
+(code structure and the Phase 0 task list), [`BOSSES`](docs/BOSSES.md) (the 10 boss sheets),
+[`PHASES_1_2`](docs/PHASES_1_2.md) (task breakdown for Phases 1 and 2).
 
 ## Building from source
 

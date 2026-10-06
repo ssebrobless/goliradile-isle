@@ -48,6 +48,9 @@ meant for ordering and expectation-setting. Everything after Phase 2 will be re-
 at the checkpoint before it.
 
 ### Phase 0 — Foundation (2–3 weeks)
+*Task-level breakdown with acceptance tests: `ARCHITECTURE.md` section 11 (P0-01 to P0-18).
+Phases 1 and 2: `PHASES_1_2.md`. Boss details: `BOSSES.md`.*
+
 *Goal: make the codebase safe to grow, with no change in behaviour.*
 
 - [ ] **0.1 CI.** GitHub Action that downloads Godot, runs the quality gates, fails the PR.
