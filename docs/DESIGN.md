@@ -34,10 +34,23 @@ as a stretch goal. Single-player first; co-op after launch (see Multiplayer).
 - A save is created with a **name, a difficulty and a world seed**. Saves are slots; the
   player picks which to resume. Quit-and-resume works at any moment, including mid-night
   and mid-boss.
-- Days are long enough to plan in (target 6–8 minutes; today's 165 s is placeholder).
-- Autosave at every dawn and on quit; manual save any time.
+- Days are **7 minutes** (today's 165 s is placeholder). Beds let the player **sleep to skip
+  the rest of the day** (at a hunger cost) so long multi-day runs have no dead time.
+- **Rolling autosaves** (the last 3) at every dawn and on quit, plus manual saves any time.
+  A bad autosave is never the only copy.
 - The run is won by defeating the **final boss**. After that, an endless mode continues
   the same save.
+
+### Death and game over
+A save is **never wiped** by dying. Lives apply per night or boss fight, not per run:
+Easy has cheap respawns, Normal costs you part of your inventory, Hard gives few lives and a
+lost boss fight costs real progress. A wipe-on-death "Hardcore" mode may be added later.
+
+### Threat scaling
+Raid strength is anchored to **progress, not the calendar**: bosses defeated sets the
+baseline, plus a small capped creep for days spent since the last boss. Stalling can't make
+raids infinite and rushing can't skip the challenge. (Today raids scale with nights survived;
+this changes in ROADMAP Phase 1.)
 
 ### Difficulties
 
@@ -55,6 +68,8 @@ starting targets; `data/difficulty` owns the real values.
 | Boss telegraphs | long | baseline | short |
 | Boss retreat if you stall | yes | yes | yes, but it comes back stronger |
 
+Difficulty is **fixed when the save is created, but can be lowered later** (never raised).
+
 ### Player-count scaling (co-op)
 Difficulty scales separately by the number of players, so a 4-player Normal is not just
 "Normal with more HP". Per additional player: raids grow in number first (capped), then in
@@ -62,6 +77,11 @@ toughness; boss health scales by a smaller factor than raid size (as in Terraria
 mode) so fights stay about the same length; resource regrowth rises so the group isn't
 starved. Expected run length for co-op: 1–5 days of calendar time. The formulas live in one
 place (`data/difficulty`) and are covered by the balance tools.
+
+### Player power (open)
+Levels cap at 122 today. The intended direction is a system where **levels and gear
+interact**: gear and armour grant special effects that levels unlock or scale, so neither
+replaces the other. This needs its own design pass (see DECISIONS "Open").
 
 ## Core loop systems (existing)
 
@@ -78,8 +98,9 @@ minions, and a boss that reshapes the map.
 
 ### Anatomy of a boss night
 - **Summoned**, not scheduled. The player builds a summoning altar and crafts a summon item
-  from late-tier materials, so *they* choose when to fight. Each boss is gated by the tech
-  and the previous boss.
+  from late-tier materials, so *they* choose which night to fight. The fight can only be
+  **started at dusk**, so players prepare by day (and sleep to dusk when ready). Each boss is
+  gated by the tech and the previous boss.
 - **Phases** change at health thresholds (e.g. 100/66/33%): new attacks, new minion mix,
   new arena hazards. The boss does a visible, audible phase transition.
 - **Escalation clock:** the longer the night runs, the faster minions spawn and the harder
@@ -88,6 +109,10 @@ minions, and a boss that reshapes the map.
 - **Retreat rule:** if the player is clearly losing (or all lives are gone) the boss
   retreats at dawn and heals; the fight can be re-summoned. A bad night never dead-ends a
   save.
+- **Size and movement:** bosses are large (3×3 tiles or more) and ignore tile pathfinding;
+  walls slow them by being smashed, not by blocking. The camera may zoom out during fights.
+- **Structure damage:** destroyed structures leave **ruins that can be rebuilt at roughly half
+  cost**. Terrain effects (fire, ice, flood) revert when the fight ends.
 - **Rewards:** drops that unlock the next tier of towers or automation, plus a first-kill
   bonus. Boss kills are recorded in the save.
 - Everything is **saveable mid-fight**.
@@ -114,7 +139,8 @@ revert on defeat or at dawn. Bosses use the system; they don't edit tiles direct
 ## Towers (the Bloons side)
 
 - **Upgrade paths** replace flat stat points: three paths per tower, tiers per path, with a
-  cross-path cap so a tower specialises.
+  cross-path cap so a tower specialises. **Per-turret XP and levels are removed**; kills fund
+  upgrades through drops instead.
 - **Targeting modes:** first, last, strongest, closest (plus tower-specific modes).
 - **Placement limits** come from tech and difficulty instead of the fixed cap of 5.
 - **Upgrade currency:** boss and croc drops (bones, hides, boss materials), so killing
@@ -137,13 +163,15 @@ Not a full Factorio. Enough that building a supply chain is a real, satisfying p
 
 Host-authoritative co-op over Godot's high-level networking, 2–4 players to start. It is not
 built until after single-player launch, but **no new system may assume a single player**:
-state is per-player (`players` list), enemies target the nearest player, and randomness goes
-through a seeded service. See ROADMAP Phase 0 and Phase 7.
+state is per-player (`players` list), enemies target the nearest player, randomness goes
+through a seeded service, and **all player actions go through a command queue** (so
+single-player uses the same path co-op will). See ROADMAP Phase 0 and Phase 7.
 
 ## Art, audio, UX (launch requirements)
 
 - Original or properly licensed art, sprites, tiles and animation; no placeholder
-  procedural art in the shipped game.
+  procedural art in the shipped game. **Tiles stay 16 px**, with richer sprites; bosses are
+  drawn as multi-tile 16 px sprites.
 - Original or licensed audio: sound effects, per-biome and per-boss music.
 - Onboarding: a guided first day that teaches controls and the loop.
 - Accessibility: rebindable keys, text scaling, colour-blind-safe cues, screen-shake and

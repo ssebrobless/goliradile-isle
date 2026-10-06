@@ -62,11 +62,14 @@ at the checkpoint before it.
 - [ ] **0.4 Players list.** `players: Array[PlayerState]` with a `local_player` accessor.
       Croc targeting picks the nearest player; the flow field becomes a multi-source search.
       Single-player behaviour is identical.
+- [ ] **0.4b Command queue.** Player actions (move, place, craft, attack, interact) become
+      commands applied by the simulation, so single-player is a local host and co-op later
+      adds only networking. Behaviour is unchanged.
 - [ ] **0.5 Seeded randomness service.** All gameplay randomness goes through one service
       with per-system streams (needed for tests, boss patterns, and later networking).
 - [ ] **0.6 Save v2.** Versioned format with a migration from today's save; a header
-      (name, difficulty, nights, boss progress, playtime, timestamp); multiple slots; autosave
-      at dawn; Save & Quit works mid-night.
+      (name, difficulty, nights, boss progress, playtime, timestamp); multiple slots; **rolling
+      autosaves (last 3)** at dawn and on quit; Save & Quit works mid-night.
 - [ ] **0.7 Time constants.** Day/night lengths become data, ready for Phase 1 tuning.
 
 *Exit:* CI green; `soak`/`defense` numbers unchanged within tolerance; existing saves migrate.
@@ -79,11 +82,15 @@ at the checkpoint before it.
 - [ ] **1.2 Pause menu** (Esc): resume, settings, save, save & quit to menu.
 - [ ] **1.3 Difficulty data:** the three sets of multipliers (raid size/HP/damage/speed,
       regrowth, hunger/thirst, lives, boss telegraph length) read through one config.
-- [ ] **1.4 Day length** raised to the 6–8 minute target; re-tune hunger, regrowth and
+- [ ] **1.4 Day length** raised to **7 minutes**; re-tune hunger, regrowth and
       growth timers per day so the economy feels right at the new length.
 - [ ] **1.5 Balance tooling per difficulty:** `--balance` and `--defense` take a difficulty
       and report the curve; recorded as new baselines.
 - [ ] **1.6 Playtime tracking** shown in the slot list.
+- [ ] **1.7 Beds / sleep:** sleep to skip to dusk at a hunger cost.
+- [ ] **1.8 Threat anchor:** raid strength driven by bosses defeated plus capped day creep
+      (replaces nights survived); death policy per difficulty (never wipes a save; lives per
+      night/boss, inventory loss on Normal); difficulty lowerable after creation.
 
 *Exit / checkpoint A:* owner plays a few days on each difficulty and reports pacing.
 
@@ -96,7 +103,9 @@ at the checkpoint before it.
       banners; arena setup; retreat rule; win/lose handling; mid-fight save and load.
 - [ ] **2.2 Terrain-event system** (first primitive: burn). Reversible, saved, reverts on
       defeat or dawn. Tests for apply/revert/save round-trip.
-- [ ] **2.3 Summoning:** altar structure, summon item, tech/previous-boss gating, UI.
+- [ ] **2.3 Summoning:** altar structure, summon item, tech/previous-boss gating, UI. The
+      fight can only be started at dusk. Large (3×3+) boss bodies that ignore pathing and
+      smash structures; ruins and rebuild-at-reduced-cost for destroyed structures.
 - [ ] **2.4 First boss: Red** (fire). Chosen because its map interaction exercises the
       terrain-event system.
 - [ ] **2.5 `--bossfight <type> [difficulty] [tower loadout]`** headless simulation, with
@@ -111,7 +120,8 @@ nine more.
 *Goal: defence you can think about.*
 
 - [ ] **3.1 Upgrade paths:** three paths per tower with tiers and a cross-path cap, replacing
-      flat stat points; costing; migration of existing turret saves.
+      flat stat points; costing; **remove per-turret XP and levels**; migration of existing
+      turret saves.
 - [ ] **3.2 Targeting modes** and a tower info/upgrade panel with range display.
 - [ ] **3.3 Upgrade currency** from drops (bones, hides, boss materials).
 - [ ] **3.4 Placement limits** from tech and difficulty instead of the fixed 5; sell and
@@ -209,8 +219,11 @@ assumptions.
 | Early Access | Phase 6 | art, audio, tutorial, builds, Steam |
 | Co-op | Phase 7 | multiplayer and player scaling |
 
-Rough total to Early Access: **10–16 months** of focused work. Treat it as a range to plan
-around, not a promise. The checkpoints exist to re-plan.
+Rough total to Early Access: **10–16 months of focused work**. At the stated pace
+(**evenings and weekends, roughly 5–10 hours a week**, no fixed date) calendar time is
+several times longer, plausibly **2–3 years**. Treat it as a range to plan around, not a
+promise; the checkpoints exist to re-plan. If an earlier public build matters, the lever is
+a **smaller first release** (fewer bosses, no automation), not working faster.
 
 ## Dependencies
 
@@ -241,12 +254,12 @@ around, not a promise. The checkpoints exist to re-plan.
 
 | Decision | Default |
 |---|---|
-| Day length | 6–8 min, tuned in Phase 1 |
-| Upgrade currency | boss and croc drops (bones, hides, boss materials) |
+| Day length | **decided: 7 min**, tuned in Phase 1 |
+| Upgrade currency | boss and croc drops (bones, hides, boss materials); turret XP is removed |
 | Final map size | about 128 square; revisit after 5a profiling |
-| Lives on Hard | few, and a lost boss fight costs progress (no true permadeath) |
+| Lives on Hard | **decided:** few, a lost boss fight costs progress; saves are never wiped |
 | Co-op baseline | 2–4 players; formulas in `data/difficulty` |
-| Art direction (stay pixel or move up) | keep pixel art, higher fidelity; decide before commissioning |
+| Art direction | **decided:** 16 px tiles, richer sprites, multi-tile bosses |
 | Early Access vs full launch | Early Access after Phase 6 |
 | Price and platforms | decide before the Steam page; Windows/macOS/Linux |
 | Final name | trademark check before the Steam page |
