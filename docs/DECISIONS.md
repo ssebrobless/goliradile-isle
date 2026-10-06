@@ -4,6 +4,27 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 2 (player power)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| P1 | Player's combat role | Hybrid: strong fighter, towers hold the base | Boss fights tuned so neither can carry alone |
+| P2 | What levels give | Stat points + perk points | Perk tree (2b.2); stats stay as the base |
+| P3 | Levels and gear | Attunement: gear has perk slots that levels unlock and strengthen | Core of 2b.3; UI shows next unlock level |
+| P4 | Gear slots | Weapon, tool, 3 armour, 2 accessories | 2b.1 |
+| P5 | Gear sources | Boss-themed sets from boss materials + tech-tier base gear | Each boss ships a set (4.4); first is Red (2b.7) |
+| P6 | Builds | Free-form; perks and gear steer the build | No classes |
+| P7 | Active abilities | 2–3 with cooldowns, unlocked by level and gear | 2b.4; each boss set adds one |
+| P8 | Player buffs towers | Yes, perks and gear can buff nearby towers | 3.8 |
+| P9 | Respec | Free at the workbench or bed | Encourages tuning for each boss |
+| P10 | Level cap | **65** (owner's choice) | Stat caps retuned (1.9); per-level pacing designed for 65 |
+| P11 | XP source | Player earns XP from all kills, towers at a reduced rate; bosses and milestones add bonuses | Turret XP removed (1.9, 3.1) |
+| P12 | Food | Yes: a wide set of cooked meals with unique timed buffs, like Terraria potions (owner's addition) | Buff framework (2b.5), meals (2b.6, grows through 4 and 6); "D2" resolved |
+
+Also: PR #1 (`will-bogusz`) — the fork was only for sharing ideas. Decision: **we proceed with
+our own ideas only and push to this repository**; PR #1 will not be merged. Closing it, with a
+thank-you note, is the owner's call.
+
 ## Round 1 (design review)
 
 | ID | Question | Decision | Implication |
@@ -25,20 +46,18 @@ is still open. Newest round first.
 
 ## Open
 
-- **D2 Player power.** Not decided. Direction from the owner: keep levels meaningful by making
-  levels and gear interact, with armour and gear granting special effects that levels unlock
-  or scale, instead of cutting levels. Needs a follow-up design pass before gear tiers, boss
-  rewards (Phase 2/4) and `PROGRESSION.md` are written.
+- **Player power details** (the direction is decided; these numbers and lists are not): perk
+  tree layout and size; perk-point rate per level; per-stat caps with the cap of 65;
+  attunement thresholds (which levels unlock slots and ranks); the ability list; the cooked
+  meal list; buff stacking, duration and whether a meal spoils; the aura radius for tower
+  buffs; how player power scales with difficulty. These go in `PLAYER.md` before Phase 2b.
 - **J1 Repository visibility.** The repo is **public** and has been forked once. For a game that
   will be sold, recommend **private**. Making it private detaches existing public forks, which
   stay public with whatever code they already copied; the proprietary licence applies from now
   on but does not recall earlier copies. Owner to decide, then change the setting on GitHub.
-- **PR #1 (`will-bogusz`, draft, June).** A fork owner's draft PR proposes about 7,000 lines of
-  changes, including an AStarGrid2D rework of croc pathing, based on the original commit. It
-  overlaps heavily with the croc steering, separation, soak and turret fixes already merged,
-  so it cannot merge as is. Needs a decision: close, port selected ideas, or rebase. It also
-  raises the team question (J2): if William contributes code, a simple contributor agreement
-  is needed before a commercial release.
+- **PR #1 (`will-bogusz`).** Resolved above: not merging, owner decides whether to close it. If
+  anyone other than the owner ever contributes code, a simple contributor agreement is needed
+  before a commercial release.
 - **`PROGRESSION.md`** (tiers, boss order, materials) and **`TOWERS.md`** (roles, upgrade
   paths) still to be written; D2 blocks part of the first.
 - Remaining items marked in `ROADMAP.md` "Decisions we still need": price and platforms, name

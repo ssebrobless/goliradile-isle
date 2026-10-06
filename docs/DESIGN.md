@@ -78,10 +78,40 @@ mode) so fights stay about the same length; resource regrowth rises so the group
 starved. Expected run length for co-op: 1–5 days of calendar time. The formulas live in one
 place (`data/difficulty`) and are covered by the balance tools.
 
-### Player power (open)
-Levels cap at 122 today. The intended direction is a system where **levels and gear
-interact**: gear and armour grant special effects that levels unlock or scale, so neither
-replaces the other. This needs its own design pass (see DECISIONS "Open").
+## Player power
+
+Goal: levels and gear **both** matter. Gear grants named effects; levels unlock and deepen
+them, so neither replaces the other. Numbers below are starting proposals for tuning.
+
+- **Role: hybrid.** The player is a strong fighter and the towers hold the base. Boss fights
+  need both: towers handle waves and chip damage; the player dodges, bursts and uses
+  abilities. Neither can carry a boss alone.
+- **Levels 1–65.** Each level grants a stat point (the five stats: health, attack, speed,
+  armor, regen) and perk points (proposal: a perk point every level or two). Per-stat caps
+  are revisited for the lower level cap. Levels beyond the cap are not needed; late power
+  comes from gear and perk depth.
+- **Perk tree.** Free-form branches themed by playstyle (Brawler, Marksman,
+  Engineer/Commander, Survivalist). Any mix is allowed; there are no classes.
+- **Gear slots:** weapon, tool, 3 armour pieces, 2 accessories.
+- **Gear sources:** tech-tier base gear from your tier of the progression; **boss-themed
+  sets** crafted from boss materials, each tied to its croc type (for example the Red set
+  resists fire, the Brown set resists being undermined).
+- **Attunement (how levels and gear interact).** Each piece of gear has perk slots with named
+  effects (for example "Ember"). Player level **unlocks additional slots and raises the rank**
+  of the effects, so the gear gives the effect and the level gives the depth. The UI shows
+  which level unlocks the next slot or rank.
+- **Active abilities.** Two or three abilities with cooldowns (dodge, slam, throw and so on),
+  unlocked by level and gear. Each boss set adds one ability.
+- **Tower buffs.** Player perks and gear can buff nearby towers (for example an aura that
+  raises fire rate), tying the two halves of the game together.
+- **XP.** The player earns XP from **all** kills; kills made by towers pay at a reduced rate.
+  Bosses and milestones add bonuses. Turrets no longer level.
+- **Respec** is free at the workbench or bed, so players can retune for a specific boss.
+- **Food buffs.** Cooking grows into a wide set of **cooked meals, each with a unique timed
+  buff**, like potions in Terraria (for example fire resistance, regeneration, faster
+  gathering, tower-aura range). Meals are how a player prepares for a boss, and they give the
+  existing cooking, fish, honey and farming systems a late-game role. Stacking rules and
+  durations are still to be designed.
 
 ## Core loop systems (existing)
 

@@ -88,6 +88,9 @@ at the checkpoint before it.
       and report the curve; recorded as new baselines.
 - [ ] **1.6 Playtime tracking** shown in the slot list.
 - [ ] **1.7 Beds / sleep:** sleep to skip to dusk at a hunger cost.
+- [ ] **1.9 XP sharing and level cap:** the player earns XP from all kills (tower kills at a
+      reduced rate), turret XP removed, level cap 65, stat caps retuned. (Turret levels are
+      removed fully in 3.1; this lands the player side early.)
 - [ ] **1.8 Threat anchor:** raid strength driven by bosses defeated plus capped day creep
       (replaces nights survived); death policy per difficulty (never wipes a save; lives per
       night/boss, inventory loss on Normal); difficulty lowerable after creation.
@@ -116,6 +119,30 @@ at the checkpoint before it.
 intended tech level, readable, and fun; owner signs off the fight structure before we build
 nine more.
 
+### Phase 2b — Player power (4–6 weeks)
+*Goal: the player is worth playing, and boss gear has somewhere to land.* Runs after the boss
+slice so the Red boss can be the first source of a boss set.
+
+- [ ] **2b.1 Gear and equipment:** slots (weapon, tool, 3 armour, 2 accessories), equip UI,
+      stats from gear; tech-tier base gear.
+- [ ] **2b.2 Perk tree:** perk points, branches (Brawler, Marksman, Engineer/Commander,
+      Survivalist), free respec at the workbench or bed.
+- [ ] **2b.3 Attunement:** perk slots on gear with named effects; player level unlocks slots
+      and raises ranks; UI shows the next unlock.
+- [ ] **2b.4 Active abilities:** 2–3 with cooldowns, input, telegraph and sound; unlocked by
+      level and gear.
+- [ ] **2b.5 Timed buffs framework:** status effects with durations and icons, shared by food,
+      perks and gear.
+- [ ] **2b.6 Cooked meals:** a first set of meals with unique buffs on the existing cooking
+      systems; the full list grows through Phases 4 and 6.
+- [ ] **2b.7 First boss set:** the Red set (materials from the Red boss, set effects, one
+      ability) as the template for the rest.
+- [ ] **2b.8 Balance tooling:** `--bossfight` and `--defense` take a gear/level loadout;
+      bands recorded.
+
+*Exit / checkpoint B2:* owner plays the Red boss at two different builds and reports
+whether choices feel meaningful.
+
 ### Phase 3 — Towers, the Bloons side (3–4 weeks)
 *Goal: defence you can think about.*
 
@@ -130,6 +157,8 @@ nine more.
 - [ ] **3.6 New towers** to reach about 12–15 types, each with a distinct role against the
       croc and boss roster.
 - [ ] **3.7 Re-baseline `--defense`** for the new system.
+- [ ] **3.8 Player-to-tower buffs:** perks and gear that buff nearby towers (aura range,
+      fire rate), tuned with the tower paths.
 
 *Exit / checkpoint C:* owner plays nights 1–15 on Normal and reports whether tower choices
 feel meaningful.
@@ -145,7 +174,8 @@ feel meaningful.
 - [ ] **4.3 Final boss (the Great Goliradile):** 5–6 phases combining all abilities,
       world-scale hazards (flood, quake, fire, ice), minion director drawing on every
       family; the escalation clock and the retreat rule tuned for the longest fight.
-- [ ] **4.4 Boss progression:** order, gating, rewards, summon items, first-kill bonuses.
+- [ ] **4.4 Boss progression:** order, gating, rewards, summon items, first-kill bonuses; the
+      boss-themed gear set, attunement effects and ability for each boss; its cooked meals.
 - [ ] **4.5 Ending:** victory sequence, credits (with the dedication), endless-mode unlock.
 - [ ] **4.6 Balance pass:** all 10 bosses × 3 difficulties, using sims for ranges and
       playtests for feel.
@@ -214,6 +244,7 @@ assumptions.
 | Foundation | Phase 0 | CI, tests, modular code, players list, save v2 |
 | Playable shape | Phase 1 | slots, difficulties, pause/save/quit |
 | Boss vertical slice | Phase 2 | one finished boss and the framework |
+| Player power | Phase 2b | gear, perks, attunement, abilities, buffs, first boss set |
 | Alpha | Phase 4 | all 10 bosses; a run can be won |
 | Beta | Phase 5 | automation and the larger world |
 | Early Access | Phase 6 | art, audio, tutorial, builds, Steam |
@@ -230,6 +261,8 @@ a **smaller first release** (fewer bosses, no automation), not working faster.
 - 0.4 (players list) and 0.5 (seeded RNG) before any boss or tower code, so those aren't
   written twice.
 - 2.2 (terrain events) before bosses 4.2/4.3.
+- 2b (player power) after 2 and before 4, so every boss ships with its set, ability and
+  meals; 2b depends on 0.2 (data tables), 0.4/0.4b (players, commands) and 1.9.
 - 5a (world scale) before 5b–5d, and before final art, since the art pipeline depends on the
   map's biome set.
 - 1.4 (day length) before economy and balance work, so tuning isn't thrown away.
