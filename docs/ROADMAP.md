@@ -53,8 +53,9 @@ Phases 1 and 2: `PHASES_1_2.md`. Boss details: `BOSSES.md`.*
 
 *Goal: make the codebase safe to grow, with no change in behaviour.*
 
-- [ ] **0.1 CI.** GitHub Action that downloads Godot, runs the quality gates, fails the PR.
-      Make `--selftest` exit non-zero on failure. Record soak/defense/perf baselines.
+- [x] **0.1 CI.** GitHub Action that downloads Godot, runs the quality gates, fails the PR.
+      `--selftest` exits non-zero on failure; baselines for balance, soak and defense recorded in
+      `ci/baselines.json` and checked by `ci/check.py` (done: P0-01 and P0-02).
 - [ ] **0.2 Data tables out of code.** Move croc, turret, structure, recipe and balance
       constants into `data/` (typed GDScript resources or JSON). First step toward
       difficulty and boss definitions.

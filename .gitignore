@@ -9,3 +9,6 @@ build/
 # Logs
 _out.log
 *.log
+
+# CI tool outputs
+ci/out/
