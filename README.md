@@ -47,6 +47,9 @@ to fit the window, so any size keeps the same layout.
 
 See [`docs/DESIGN.md`](docs/DESIGN.md) for the vision (bosses, difficulties, towers,
 automation, co-op) and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the phased plan to launch.
+Supporting docs: [`DECISIONS`](docs/DECISIONS.md) (choices made), [`PROGRESSION`](docs/PROGRESSION.md)
+(tiers and pacing), [`TOWERS`](docs/TOWERS.md), [`PLAYER`](docs/PLAYER.md) (power, gear, perks,
+meals), [`ASSETS`](docs/ASSETS.md) (art and audio licences).
 
 ## Building from source
 

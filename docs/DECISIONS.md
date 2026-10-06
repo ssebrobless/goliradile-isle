@@ -161,11 +161,11 @@ thank-you note, is the owner's call.
 
 ## Open
 
-- **Content to draft** (the rules are decided in `DESIGN.md`; the lists are not): `PLAYER.md`
-  (the 48 perks and their branches; named gear effects and per-rank values; the ~20 meals and
-  their buffs; ability numbers; the aura stack cap), `PROGRESSION.md` (tiers by boss),
-  `TOWERS.md` (roles for the 12 towers, upgrade paths), `ASSETS.md` (licence policy and
-  manifest format). Claude drafts, the owner reviews; numbers are tuned in playtests.
+- **Content docs are drafted and awaiting owner review:** `PLAYER.md` (stats, 48 perks, gear
+  and attunement, boss sets, abilities, 20 meals), `PROGRESSION.md` (10 tiers, biomes, pacing),
+  `TOWERS.md` (12 towers and their upgrade paths), `ASSETS.md` (licence policy, manifest,
+  credits). All numbers are starting proposals tuned in playtests. `PLAYER.md` ends with
+  **interpretations I made that need confirming** (notably how attunement slots work).
 - **Co-op formulas** start from S6 and are finalised in Phase 7.
 - **Repository visibility (decided: public until the first public build).** With no Early
   Access, the first public build is the 1.0 launch, possibly years away, so design docs, boss
