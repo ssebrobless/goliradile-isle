@@ -4,6 +4,19 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 11 (confirmations after reading the planning docs)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| T1 | Tick rate | 60 ticks per second, fixed | `ARCHITECTURE.md` section 5 |
+| T2 | Save format | Binary body with version and checksum; JSON headers and profile | Section 7 |
+| T3 | Difficulty values | Accepted as starting points; tune in the checkpoint-A playtest | `PHASES_1_2.md` P1-01 |
+| T4 | Boss pressure numbers | Accepted as starting points; tune with `--bossfight` and checkpoint B | `BOSSES.md` shared rules |
+| T5 | Language | Stay in GDScript; revisit only if budgets fail | |
+| T6 | Test framework | In-repo runner | P0-13 |
+| T7 | Phase 0 order | As listed | `ARCHITECTURE.md` section 11 |
+| T8 | PR #8 | Owner has read the docs; merge it | Merged; Phase 0 begins |
+
 ## Planning docs written after round 10
 
 At the owner's request, three more planning documents were drafted: `ARCHITECTURE.md` (target

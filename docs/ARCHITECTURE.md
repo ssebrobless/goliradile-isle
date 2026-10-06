@@ -307,13 +307,14 @@ unchanged within tolerance; save v2 round-trips; `Main.gd` is glue.
 - Numbers that affect balance live in `data/`, not inline.
 - Commit messages explain why; PRs describe testing and anything not tested.
 
-## 13. Open technical questions (with my default)
+## 13. Technical defaults (confirmed by the owner unless marked)
 
-| Question | Default |
+| Question | Decision |
 |---|---|
-| Fixed tick rate | 60 Hz |
-| Language for hot loops | stay in GDScript, use packed arrays, profile first; revisit (GDExtension or C#) only if budgets fail |
-| Save body encoding | Godot `var_to_bytes` with a version and checksum (compact, native types); JSON only for headers and profile so they are inspectable |
-| Chunk size | 16×16 |
-| Spatial hash cell size | 2 tiles |
-| Test framework | the in-repo runner (no third-party addon) |
+| Fixed tick rate | **60 Hz (confirmed)** |
+| Language for hot loops | **stay in GDScript (confirmed)**: packed arrays, profile first; revisit (GDExtension or C#) only if budgets fail |
+| Save body encoding | **confirmed:** Godot `var_to_bytes` with a version and checksum (compact, native types); JSON only for headers and profile so they are inspectable |
+| Chunk size | 16×16 (default, tune in 2a) |
+| Spatial hash cell size | 2 tiles (default, tune in 2a) |
+| Test framework | **in-repo runner (confirmed)**, no third-party addon |
+| Phase 0 order | **as listed in section 11 (confirmed)** |
