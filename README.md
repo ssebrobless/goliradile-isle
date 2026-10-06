@@ -43,6 +43,16 @@ to fit the window, so any size keeps the same layout.
   generators + wires (powered turrets) → pipes + a breeding aquarium. Deep nights demand
   a generator-powered defense — hand-poured wine can't keep up.
 
+## Where the game is going
+
+See [`docs/DESIGN.md`](docs/DESIGN.md) for the vision (bosses, difficulties, towers,
+automation, co-op) and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the phased plan to launch.
+Supporting docs: [`DECISIONS`](docs/DECISIONS.md) (choices made), [`PROGRESSION`](docs/PROGRESSION.md)
+(tiers and pacing), [`TOWERS`](docs/TOWERS.md), [`PLAYER`](docs/PLAYER.md) (power, gear, perks,
+meals), [`ASSETS`](docs/ASSETS.md) (art and audio licences), [`ARCHITECTURE`](docs/ARCHITECTURE.md)
+(code structure and the Phase 0 task list), [`BOSSES`](docs/BOSSES.md) (the 10 boss sheets),
+[`PHASES_1_2`](docs/PHASES_1_2.md) (task breakdown for Phases 1 and 2).
+
 ## Building from source
 
 Open the project in Godot 4.6.x and run `Main.tscn`, or export via the included
