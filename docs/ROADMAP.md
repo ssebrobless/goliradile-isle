@@ -127,7 +127,8 @@ at the checkpoint before it.
       fight can only be started at dusk. Large (3×3+) boss bodies that ignore pathing and
       smash structures; ruins and rebuild-at-reduced-cost for destroyed structures.
 - [ ] **2.4 First boss: Red** (fire). Built first as the slice; in play it is gated as the
-      **third** boss (fixed order). Chosen because its map interaction exercises the
+      **third** boss (fixed order). On the small map with
+      stand-in materials until Phase 2c. Chosen because its map interaction exercises the
       terrain-event system.
 - [ ] **2.5 `--bossfight <type> [difficulty] [tower loadout]`** headless simulation, with
       recorded pass bands (e.g. "fresh turrets lose; geared turrets win in N minutes").
@@ -140,6 +141,30 @@ at the checkpoint before it.
 *Exit / checkpoint B (first external playtest):* the Red boss is beatable on Normal at the
 intended tech level, readable, and fun; owner signs off the fight structure before we build
 nine more.
+
+### Phase 2c — World scale and biomes (6–8 weeks)
+*Goal: the real world exists before gear and the remaining bosses are built on it.* Boss sets
+need biome materials, and bosses march in from map-edge fronts, so the 160×160 world comes
+right after the boss slice. The Red boss from Phase 2 runs on the small map with stand-in
+materials until this phase lands.
+
+- [ ] **2c.1 World scale.** Map of **160×160** with biomes and ore deposits; chunked
+      simulation; spatial indexes; world-gen rework. Measured costs on the 50×50 map that
+      would grow about 10×: croc path rebuild 5.3 ms (bound it to a radius and use coarse
+      chunk-level routing for long marches), world growth tick 1.1 ms (spread over chunks),
+      structure scan 0.12 ms per pink croc (cache it), night/day swap 7 ms (only near the
+      base). Night clearing applies only near the base. Raids spawn at the edge or water and
+      march in along fronts. Must hold the performance budgets before anything else is built
+      on it. Save migration.
+- [ ] **2c.2 Biomes and weather:** the five biomes (jungle, rocky highlands, swamp, frozen cove,
+      volcano) with their ores and materials, and a few weather events (rain, storm, fog);
+      no seasons.
+- [ ] **2c.3 Re-home the Red boss:** its set and summon materials move from stand-ins to the
+      volcano biome; raid and boss fronts use the new map; `--soak`, `--defense` and
+      `--bossfight` baselines are re-recorded at 160×160.
+
+*Exit / checkpoint B3:* the 160×160 world with five biomes holds the performance budgets; the
+Red boss is fought on it; the owner explores it and reports on size and pacing.
 
 ### Phase 2b — Player power (4–6 weeks)
 *Goal: the player is worth playing, and boss gear has somewhere to land.* Runs after the boss
@@ -219,29 +244,18 @@ feel meaningful.
 *Exit / checkpoint D:* a full run is possible start to finish on every difficulty.
 This is the **Alpha**.
 
-### Phase 5 — Automation and world scale, the Factorio side (8–14 weeks)
-*Goal: a base worth building.* The largest and riskiest phase; it is split so each part
+### Phase 5 — Automation, the Factorio side (6–10 weeks)
+*Goal: a base worth building.* Runs on the larger world built in Phase 2c. Split so each part
 ships on its own.
 
-- [ ] **5a World scale (do first).** Map of **160×160** with biomes and ore deposits; chunked
-      simulation; spatial indexes; world-gen rework. Measured costs on the 50×50 map that
-      would grow about 10×: croc path rebuild 5.3 ms (bound it to a radius and use coarse
-      chunk-level routing for long marches), world growth tick 1.1 ms (spread over chunks),
-      structure scan 0.12 ms per pink croc (cache it), night/day swap 7 ms (only near the
-      base). Night clearing applies only near the base. Raids spawn at the edge or water and
-      march in along fronts. Must hold the performance budgets before anything else is built
-      on it. Save migration.
 - [ ] **5b Production chains:** miners, conveyor belts, smelters/assemblers with recipes,
       item flow and throughput readouts.
 - [ ] **5c Supply logistics:** feeders that deliver ammo and fuel to towers; power grid with
       capacity and load; brown-outs.
 - [ ] **5d Quality of life:** minimap and map, blueprint copy/paste, search in menus.
 - [ ] **5e Rebalance** raids, bosses and economy for the larger world and automation.
-- [ ] **5f Biomes and weather:** the five biomes (jungle, rocky highlands, swamp, frozen cove,
-      volcano) with their ores and materials, and a few weather events (rain, storm, fog);
-      no seasons.
 
-*Exit / checkpoint E:* the owner can run a long Hard save on the larger map with a working
+*Exit / checkpoint E:* the owner can run a long Hard save on the 160×160 map with a working
 factory; performance budgets hold. This is the **Beta**.
 
 ### Phase 6 — Launch content and polish (10–16 weeks, partly outsourced)
@@ -259,7 +273,8 @@ factory; performance budgets hold. This is the **Beta**.
       UI scaling, colour-blind-safe cues (a distinct icon or shape per croc type), screen-
       shake and flash toggles; clear settings. (Controller support is post-launch.)
 - [ ] **6.5 Localisation-ready strings.**
-- [ ] **6.6 Achievements** (the only Steam feature at launch; cloud saves, Workshop and
+- [ ] **6.6 Achievements:** about 25: each of the 10 bosses, a win on each difficulty, and
+      build milestones (the only Steam feature at launch; cloud saves, Workshop and
       leaderboards are not planned for launch).
 - [ ] **6.7 Performance and min-spec pass;** local crash and error logs (nothing is sent
       automatically); a Bug Report button that opens the log folder.
@@ -300,7 +315,8 @@ assumptions.
 | Boss vertical slice | Phase 2 | one finished boss and the framework |
 | Player power | Phase 2b | gear, perks, attunement, abilities, buffs, first boss set |
 | Alpha | Phase 4 | all 10 bosses; a run can be won |
-| Beta | Phase 5 | automation and the larger world |
+| Big world | Phase 2c | 160×160, five biomes, weather |
+| Beta | Phase 5 | automation on the big world |
 | 1.0 launch | Phase 6 | art, audio, tutorial, builds, Steam; no Early Access |
 | Co-op | Phase 7 | multiplayer and player scaling |
 
@@ -317,8 +333,9 @@ so the plan keeps full scope; the checkpoints are where scope can still be cut.
 - 2.2 (terrain events) before bosses 4.2/4.3.
 - 2b (player power) after 2 and before 4, so every boss ships with its set, ability and
   meals; 2b depends on 0.2 (data tables), 0.4/0.4b (players, commands) and 1.9.
-- 5a (world scale) before 5b–5d, and before final art, since the art pipeline depends on the
-  map's biome set.
+- 2c (world scale and biomes) after Phase 2 and before 2b and Phase 4, so boss sets and bosses
+  are built once on the real map; 2c before 5 (automation), and before final art, since the
+  art pipeline depends on the map's biome set.
 - 1.4 (day length) before economy and balance work, so tuning isn't thrown away.
 - 6.x polish items can start earlier as parallel work (e.g. commissioning art during Phase 4).
 

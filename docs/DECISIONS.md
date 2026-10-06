@@ -4,6 +4,15 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 10 (audit of the docs)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| V1 | Boss sets need biome materials, but the world came after the bosses | **Build the 160×160 world and biomes right after the boss slice, before player power and the remaining bosses** | New Phase 2c (5a and 5f moved out of Phase 5); Red boss runs on the small map with stand-ins until then |
+| V2 | Achievements | About 25: each boss, a win per difficulty, build milestones | 6.6 |
+| V3 | Reviewing PR #8 | Owner reads **all seven docs** before merging | I do not merge it; I fix whatever the owner finds |
+| V4 | Starting Phase 0 | **Not yet; more planning first** | No code work until the owner says |
+
 ## Round 9 (interpretations in PLAYER.md, now confirmed)
 
 | ID | Question | Decision | Implication |
@@ -169,7 +178,7 @@ thank-you note, is the owner's call.
 | I1 | Pixel size | Keep 16 px tiles, richer sprites | Bosses are multi-tile 16 px sprites; no art redraw |
 | J2 | Team | Just the owner and Claude (see "Open" about PR #1) | Solo process; no contribution rules yet |
 | J2b | Licence | Proprietary "All rights reserved" | `LICENSE` added |
-| J3 | Pace | Evenings and weekends, no fixed date | Calendar estimate stretches to about 2–3 years; favour a smaller first release |
+| J3 | Pace | Evenings and weekends, no fixed date | Calendar estimate stretches to about 2–3 years; full scope kept (R3) |
 
 ## Open
 

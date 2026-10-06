@@ -31,7 +31,7 @@ and Linux; Steam Deck as a stretch goal. Single-player first; co-op after launch
 Multiplayer). Before 1.0, only closed playtests with invited players.
 
 - **Price: $5.** No demo. Playtest builds go to friends directly, then through Steam Playtest
-  once the store page exists. Steam features at launch: **achievements only** (no cloud saves,
+  once the store page exists. Steam features at launch: **achievements only** (about 25: each boss, a win per difficulty, build milestones; no cloud saves,
   Workshop or leaderboards at launch).
 - **After launch:** free updates (fixes, balance, and **co-op as a free update**); no paid DLC
   planned.
