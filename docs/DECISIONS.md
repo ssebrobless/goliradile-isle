@@ -4,6 +4,18 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 9 (interpretations in PLAYER.md, now confirmed)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| A1 | Attunement | Each effect-bearing piece has one effect; the player has attunement slots (1, 2nd at level 15, 3rd at level 35) choosing which are active | 2b.3 |
+| A2 | Boss set size | **Five pieces** (three armour, two accessories); the weapon is separate | Per boss: 5 pieces + 1 weapon; set bonus needs no slot |
+| A3 | Boss weapons | One per boss; the family rotates through the four branches | Boss 1 melee, 2 ranged, 3 gadget, 4 thrown, repeating |
+| A4 | Perk tier unlocks | 0, 3, 6 and 9 points in the branch | 2b.2 |
+| A5 | Tower-kill XP | 40% of the player's own-kill XP | 1.9 |
+| A6 | War cry | Unlocks at level 8 | 2b.4 |
+| A7 | Respawn | At the player's bed, otherwise the workbench | 1.8b |
+
 ## Round 8 (boss and co-op details)
 
 | ID | Question | Decision | Implication |
@@ -164,8 +176,8 @@ thank-you note, is the owner's call.
 - **Content docs are drafted and awaiting owner review:** `PLAYER.md` (stats, 48 perks, gear
   and attunement, boss sets, abilities, 20 meals), `PROGRESSION.md` (10 tiers, biomes, pacing),
   `TOWERS.md` (12 towers and their upgrade paths), `ASSETS.md` (licence policy, manifest,
-  credits). All numbers are starting proposals tuned in playtests. `PLAYER.md` ends with
-  **interpretations I made that need confirming** (notably how attunement slots work).
+  credits). All numbers are starting proposals tuned in playtests. The interpretations that
+  were flagged in `PLAYER.md` are now **confirmed** (round 9).
 - **Co-op formulas** start from S6 and are finalised in Phase 7.
 - **Repository visibility (decided: public until the first public build).** With no Early
   Access, the first public build is the 1.0 launch, possibly years away, so design docs, boss
