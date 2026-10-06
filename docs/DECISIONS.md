@@ -8,7 +8,7 @@ is still open. Newest round first.
 
 | ID | Question | Decision | Implication |
 |---|---|---|---|
-| V1 | Boss sets need biome materials, but the world came after the bosses | **Build the 160×160 world and biomes right after the boss slice, before player power and the remaining bosses** | New Phase 2c (5a and 5f moved out of Phase 5); Red boss runs on the small map with stand-ins until then |
+| V1 | Boss sets need biome materials, but the world came after the bosses | **Build the 160×160 world and biomes right after the boss slice, before player power and the remaining bosses** | New Phase 2a (5a and 5f moved out of Phase 5); Red boss runs on the small map with stand-ins until then |
 | V2 | Achievements | About 25: each boss, a win per difficulty, build milestones | 6.6 |
 | V3 | Reviewing PR #8 | Owner reads **all seven docs** before merging | I do not merge it; I fix whatever the owner finds |
 | V4 | Starting Phase 0 | **Not yet; more planning first** | No code work until the owner says |

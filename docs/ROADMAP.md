@@ -128,7 +128,7 @@ at the checkpoint before it.
       smash structures; ruins and rebuild-at-reduced-cost for destroyed structures.
 - [ ] **2.4 First boss: Red** (fire). Built first as the slice; in play it is gated as the
       **third** boss (fixed order). On the small map with
-      stand-in materials until Phase 2c. Chosen because its map interaction exercises the
+      stand-in materials until Phase 2a. Chosen because its map interaction exercises the
       terrain-event system.
 - [ ] **2.5 `--bossfight <type> [difficulty] [tower loadout]`** headless simulation, with
       recorded pass bands (e.g. "fresh turrets lose; geared turrets win in N minutes").
@@ -142,13 +142,13 @@ at the checkpoint before it.
 intended tech level, readable, and fun; owner signs off the fight structure before we build
 nine more.
 
-### Phase 2c — World scale and biomes (6–8 weeks)
+### Phase 2a — World scale and biomes (6–8 weeks)
 *Goal: the real world exists before gear and the remaining bosses are built on it.* Boss sets
 need biome materials, and bosses march in from map-edge fronts, so the 160×160 world comes
 right after the boss slice. The Red boss from Phase 2 runs on the small map with stand-in
 materials until this phase lands.
 
-- [ ] **2c.1 World scale.** Map of **160×160** with biomes and ore deposits; chunked
+- [ ] **2a.1 World scale.** Map of **160×160** with biomes and ore deposits; chunked
       simulation; spatial indexes; world-gen rework. Measured costs on the 50×50 map that
       would grow about 10×: croc path rebuild 5.3 ms (bound it to a radius and use coarse
       chunk-level routing for long marches), world growth tick 1.1 ms (spread over chunks),
@@ -156,14 +156,14 @@ materials until this phase lands.
       base). Night clearing applies only near the base. Raids spawn at the edge or water and
       march in along fronts. Must hold the performance budgets before anything else is built
       on it. Save migration.
-- [ ] **2c.2 Biomes and weather:** the five biomes (jungle, rocky highlands, swamp, frozen cove,
+- [ ] **2a.2 Biomes and weather:** the five biomes (jungle, rocky highlands, swamp, frozen cove,
       volcano) with their ores and materials, and a few weather events (rain, storm, fog);
       no seasons.
-- [ ] **2c.3 Re-home the Red boss:** its set and summon materials move from stand-ins to the
+- [ ] **2a.3 Re-home the Red boss:** its set and summon materials move from stand-ins to the
       volcano biome; raid and boss fronts use the new map; `--soak`, `--defense` and
       `--bossfight` baselines are re-recorded at 160×160.
 
-*Exit / checkpoint B3:* the 160×160 world with five biomes holds the performance budgets; the
+*Exit / checkpoint B2a:* the 160×160 world with five biomes holds the performance budgets; the
 Red boss is fought on it; the owner explores it and reports on size and pacing.
 
 ### Phase 2b — Player power (4–6 weeks)
@@ -245,7 +245,7 @@ feel meaningful.
 This is the **Alpha**.
 
 ### Phase 5 — Automation, the Factorio side (6–10 weeks)
-*Goal: a base worth building.* Runs on the larger world built in Phase 2c. Split so each part
+*Goal: a base worth building.* Runs on the larger world built in Phase 2a. Split so each part
 ships on its own.
 
 - [ ] **5b Production chains:** miners, conveyor belts, smelters/assemblers with recipes,
@@ -315,7 +315,7 @@ assumptions.
 | Boss vertical slice | Phase 2 | one finished boss and the framework |
 | Player power | Phase 2b | gear, perks, attunement, abilities, buffs, first boss set |
 | Alpha | Phase 4 | all 10 bosses; a run can be won |
-| Big world | Phase 2c | 160×160, five biomes, weather |
+| Big world | Phase 2a | 160×160, five biomes, weather |
 | Beta | Phase 5 | automation on the big world |
 | 1.0 launch | Phase 6 | art, audio, tutorial, builds, Steam; no Early Access |
 | Co-op | Phase 7 | multiplayer and player scaling |
@@ -333,8 +333,8 @@ so the plan keeps full scope; the checkpoints are where scope can still be cut.
 - 2.2 (terrain events) before bosses 4.2/4.3.
 - 2b (player power) after 2 and before 4, so every boss ships with its set, ability and
   meals; 2b depends on 0.2 (data tables), 0.4/0.4b (players, commands) and 1.9.
-- 2c (world scale and biomes) after Phase 2 and before 2b and Phase 4, so boss sets and bosses
-  are built once on the real map; 2c before 5 (automation), and before final art, since the
+- 2a (world scale and biomes) after Phase 2 and before 2b and Phase 4, so boss sets and bosses
+  are built once on the real map; 2a before 5 (automation), and before final art, since the
   art pipeline depends on the map's biome set.
 - 1.4 (day length) before economy and balance work, so tuning isn't thrown away.
 - 6.x polish items can start earlier as parallel work (e.g. commissioning art during Phase 4).
