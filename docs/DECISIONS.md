@@ -4,6 +4,19 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 8 (boss and co-op details)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| X1 | Where a boss fight happens | The boss marches in from a map-edge front toward your altar and base | Fight is base defence; ties to raid fronts (5a) |
+| X2 | Boss night cap | **15 minutes** (owner's choice) | Retreat, heal, return stronger; longer than the 12 recommended |
+| X3 | Rematches | Re-summon with reduced drops and a one-day cooldown | Also in a completed save |
+| X4 | Boss targets | A mix by phase: structures, towers, then the player | Boss attack scripts per phase |
+| X5 | Weapons and branches | Each branch favours a weapon family; any weapon works | 2b.1 |
+| X6 | UI | Keep the side panels; full-screen menus for inventory, gear, perks, map | New 2b.00 |
+| X7 | Friendly fire | None | Phase 7 |
+| X8 | Co-op rewards | Own XP per player; shared drops; own boss reward per player | 7.2b |
+
 ## Round 7 (rules and world; gaps found by rereading the plan)
 
 | ID | Question | Decision | Implication |

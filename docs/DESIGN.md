@@ -128,6 +128,10 @@ them, so neither replaces the other. Numbers below are starting proposals for tu
   Marksman, Engineer/Commander, Survivalist), so a player buys about two thirds of the tree.
   Any mix is allowed; there are no classes.
 - **Gear slots:** weapon, tool, 3 armour pieces, 2 accessories.
+- **Weapons and branches:** each branch favours a weapon family, but any weapon works.
+  Brawler: melee (fists, mallet, spear). Marksman: ranged (slingshot and successors).
+  Engineer: gadgets and tools. Survivalist: thrown and trap-style. Perks boost the matching
+  family; nothing is locked.
 - **Gear sources:** tech-tier base gear from your tier of the progression; **boss-themed
   sets** crafted from boss materials, each tied to its croc type (for example the Red set
   resists fire, the Brown set resists being undermined).
@@ -156,6 +160,12 @@ them, so neither replaces the other. Numbers below are starting proposals for tu
 - **Difficulty and player power.** Enemies scale with difficulty; player power (levels, gear,
   perks) is the same everywhere. The one deliberate exception is the number of active meal
   buffs above.
+
+## UI
+
+Keep the side panels (status on the left, context on the right) and the world in the middle.
+Inventory, gear, perks and the map open as **full-screen menus** on demand, pausing the game
+in single-player.
 
 ## Inventory, building and crafting
 
@@ -186,7 +196,7 @@ worms, fish, kiln, still; pipes and sprinklers; levels and stat points. See `REA
 ## Boss fights
 
 **One boss per crocodile type (9) plus a final giant boss = 10.** Each is its own extra-long
-night (target 6–10 minutes), inspired by Terraria: telegraphed attacks, distinct phases,
+night (**hard cap 15 minutes**), inspired by Terraria: telegraphed attacks, distinct phases,
 minions, and a boss that reshapes the map.
 
 ### Anatomy of a boss night
@@ -204,8 +214,14 @@ minions, and a boss that reshapes the map.
 - **Escalation clock:** the longer the night runs, the faster minions spawn and the harder
   the boss hits, so stalling is punished and "it gets harder as the night goes on" is real.
 - **Minions** are drawn from the boss's crocodile family, spawned in waves by a director.
-- **Retreat rule:** if the player is clearly losing (or all lives are gone) the boss
-  retreats at dawn and heals; the fight can be re-summoned. A bad night never dead-ends a
+- **Where it happens:** the boss **marches in from a map-edge front toward your altar and
+  base**, so the fight is a base defence with towers and traps, not a trip to an arena.
+- **Retreat rule:** if the 15-minute cap runs out or all lives are gone, the boss retreats,
+  heals and **returns stronger** the next time. A bad night never dead-ends a save.
+- **Targets:** a mix by phase. Early phases pressure structures and towers; later phases hunt
+  the player.
+- **Rematches:** a defeated boss can be **re-summoned with reduced drops and a one-day
+  cooldown** (to recover missed materials or practise), which also applies in a completed
   save.
 - **Size and movement:** bosses are large (3×3 tiles or more) and ignore tile pathfinding;
   walls slow them by being smashed, not by blocking. The camera may zoom out during fights.
@@ -276,7 +292,9 @@ Not a full Factorio. Enough that building a supply chain is a real, satisfying p
 
 ## Multiplayer (post-launch)
 
-Host-authoritative co-op over Godot's high-level networking, **up to 4 players**. Players are palette-swapped gorillas with player names. It is not
+Host-authoritative co-op over Godot's high-level networking, **up to 4 players**. Players are palette-swapped gorillas with player names. **No friendly fire.** **Each player
+earns their own XP, drops are shared, and each player gets their own boss reward** (so
+everyone can craft their own boss set). It is not
 built until after single-player launch, but **no new system may assume a single player**:
 state is per-player (`players` list), enemies target the nearest player, randomness goes
 through a seeded service, and **all player actions go through a command queue** (so

@@ -116,7 +116,9 @@ at the checkpoint before it.
 - [ ] **2.1 Boss framework:** `BossDef` data (health, phases, attacks, minion families,
       escalation curve); phase machine on health thresholds; attack scripts with ground
       telegraphs; wave director for minions; escalation clock; boss health bar and phase
-      banners; arena setup; retreat rule; win/lose handling; mid-fight save and load.
+      banners; the boss marches in from a map-edge front toward the altar/base; mix of
+      targets by phase; **15-minute cap** with retreat (heal, return stronger); rematches
+      with reduced drops and a one-day cooldown; win/lose handling; mid-fight save and load.
 - [ ] **2.2 Terrain-event system** (first primitive: burn). Reversible, saved, reverts on
       defeat or dawn. Tests for apply/revert/save round-trip.
 - [ ] **2.3 Summoning:** altar structure, summon item (previous boss's drop + an automation-
@@ -142,11 +144,13 @@ nine more.
 *Goal: the player is worth playing, and boss gear has somewhere to land.* Runs after the boss
 slice so the Red boss can be the first source of a boss set.
 
+- [ ] **2b.00 UI:** keep the side panels; add full-screen menus for inventory, gear, perks and
+      map (pausing in single-player).
 - [ ] **2b.0 Inventory rework:** slot-based inventory with stacks and storage chests on top of
       the Phase 0.9 inventory interface; crafting stations per tier; build caps that grow
       with tech tier and act as a performance guard.
 - [ ] **2b.1 Gear and equipment:** slots (weapon, tool, 3 armour, 2 accessories), equip UI,
-      stats from gear; tech-tier base gear.
+      stats from gear; tech-tier base gear; weapon families that branches favour (not lock).
 - [ ] **2b.2 Perk tree:** perk points, 4 branches of about 12 (Brawler, Marksman,
       Engineer/Commander, Survivalist), free respec at the workbench or bed.
 - [ ] **2b.3 Attunement:** perk slots on gear with named effects; player level unlocks slots
@@ -275,6 +279,8 @@ assumptions.
       snapshot/interpolation for crocs, projectiles and bosses; player prediction.
 - [ ] **7.2 Shared world rules:** base ownership and permissions, shared storage, per-player
       inventory, drop-in/drop-out, join-in-progress.
+- [ ] **7.2b Co-op rules:** no friendly fire; each player earns their own XP; drops are shared;
+      each player gets their own boss reward.
 - [ ] **7.3 Scaling:** player-count formulas from `DESIGN.md`, applied to raids, bosses and
       regrowth; balance sims extended with player count.
 - [ ] **7.4 Saves:** host saves; joiners see the world's slot header.
