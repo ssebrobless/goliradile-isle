@@ -39,8 +39,22 @@ Multiplayer). Before 1.0, only closed playtests with invited players.
   the rest of the day** (at a hunger cost) so long multi-day runs have no dead time.
 - **Rolling autosaves** (the last 3) at every dawn and on quit, plus manual saves any time.
   A bad autosave is never the only copy.
-- The run is won by defeating the **final boss**. After that, an endless mode continues
-  the same save.
+- **5 save slots.**
+- The run is won by defeating the **final boss**. There is **no endless mode**. The win plays
+  the **credits** (automatically on the first win only; a **Credits** button in the main menu
+  replays them any time) and records a Hall of Fame entry. The save is **marked complete and
+  stays playable as a free-play sandbox** (no further boss scaling or goals).
+
+### Hall of Fame
+A main-menu screen listing every win. It lives in the **player profile, not in a save slot**,
+so deleting a save never deletes the record. Each entry stores: date, **difficulty**, **number
+of players**, **time taken** (playtime), **final level and perk build**, **gear and tower
+roster**, and **boss kill times and deaths**. A base screenshot was considered and dropped.
+
+### Progression order
+Bosses are fought in a **fixed order matching the croc unlock order**: Green, Yellow, Red,
+Blue, Pink, Brown, Purple, White, Black, then the Final. **One tech tier per boss** (10 tiers):
+beating a boss unlocks the next tier of gear, towers, automation and meals.
 
 ### Death and game over
 A save is **never wiped** by dying. Lives apply per night or boss fight, not per run:
@@ -92,7 +106,7 @@ them, so neither replaces the other. Numbers below are starting proposals for tu
   armor, regen), each stat capped at **30**, so 65 points fill two stats and part of a third
   and you must choose a shape. A **perk point every 2 levels** (about 32 in total).
   Late power comes from gear and perk depth.
-- **Perk tree.** About **48 perks** in free-form branches themed by playstyle (Brawler,
+- **Perk tree.** About **48 perks** in **4 branches of about 12** themed by playstyle (Brawler,
   Marksman, Engineer/Commander, Survivalist), so a player buys about two thirds of the tree.
   Any mix is allowed; there are no classes.
 - **Gear slots:** weapon, tool, 3 armour pieces, 2 accessories.
@@ -143,7 +157,9 @@ minions, and a boss that reshapes the map.
   lives run out (the boss then retreats).
 - **Minions:** up to **60 or more** on screen. That is a performance target (see ROADMAP).
 - **Summoned**, not scheduled. The player builds a summoning altar and crafts a summon item
-  from late-tier materials, so *they* choose which night to fight. The fight can only be
+  from the **previous boss's drop plus a component from the automation chain**, so *they*
+  choose which night to fight. The component can always be **hand-crafted at high cost**;
+  automation makes it cheap, and it is effectively required for the larger bosses. The fight can only be
   **started at dusk**, so players prepare by day (and sleep to dusk when ready). Each boss is
   gated by the tech and the previous boss.
 - **Phases** change at health thresholds (e.g. 100/66/33%): new attacks, new minion mix,
@@ -190,12 +206,15 @@ revert on defeat or at dawn. Bosses use the system; they don't edit tiles direct
 - **Placement limits:** the cap **grows with tech tier** and the cost of each further tower
   rises, instead of the fixed cap of 5, so early game stays tight and spamming one tower is
   expensive.
-- **Upgrade currency:** boss and croc drops (bones, hides, boss materials), so killing
+- **Upgrade currency:** **bones and hides for early tiers, boss materials for top tiers**, so killing
   things funds defence.
 - Sell with a partial refund. A tower info panel shows range, targeting and path state.
 - **Fast-forward** (2×/3×) during **raids only**; boss fights run at normal speed because their
   telegraphs and phase changes are timed for it.
-- **12 tower types at launch** (the 9 existing plus 3 new).
+- **12 tower types at launch:** the 9 existing plus 3 new: a **Repair tower** (heals nearby
+  structures and speeds rebuilding ruins), a **Terrain tower** (slow zones, walls or fire
+  patches, using the terrain-event system) and a **Collector** (auto-gathers drops and
+  trickles resources).
 - **Upgrade structure:** 3 paths per tower, **4 tiers per path**, cross-path cap **4/2/0**
   (top out one path, take a second partway, never all three).
 - **Supply:** one idea covers fuel and ammo (wine, oil or ammo). It is hand-fed early; the
@@ -220,7 +239,7 @@ Not a full Factorio. Enough that building a supply chain is a real, satisfying p
 
 ## Multiplayer (post-launch)
 
-Host-authoritative co-op over Godot's high-level networking, 2–4 players to start. It is not
+Host-authoritative co-op over Godot's high-level networking, **up to 4 players**. It is not
 built until after single-player launch, but **no new system may assume a single player**:
 state is per-player (`players` list), enemies target the nearest player, randomness goes
 through a seeded service, and **all player actions go through a command queue** (so

@@ -67,6 +67,8 @@ at the checkpoint before it.
       adds only networking. Behaviour is unchanged.
 - [ ] **0.5 Seeded randomness service.** All gameplay randomness goes through one service
       with per-system streams (needed for tests, boss patterns, and later networking).
+- [ ] **0.6b Player profile file** (separate from the 5 save slots): Hall of Fame entries,
+      credits-seen flag and settings, so deleting a save never loses them.
 - [ ] **0.6 Save v2.** Versioned format with a migration from today's save; a header
       (name, difficulty, nights, boss progress, playtime, timestamp); multiple slots; **rolling
       autosaves (last 3)** at dawn and on quit; Save & Quit works mid-night.
@@ -80,8 +82,8 @@ at the checkpoint before it.
 ### Phase 1 — Run structure and difficulty (1–2 weeks)
 *Goal: the shape of a save.*
 
-- [ ] **1.1 New Game flow:** slot, name, difficulty, seed; Continue lists slots with their
-      headers.
+- [ ] **1.1 New Game flow:** slot (5 slots), name, difficulty, seed; Continue lists slots
+      with their headers.
 - [ ] **1.2 Pause menu** (Esc): resume, settings, save, save & quit to menu.
 - [ ] **1.3 Difficulty data:** the three sets of multipliers (raid size/HP/damage/speed,
       regrowth, hunger/thirst, lives, boss telegraph length) read through one config.
@@ -109,10 +111,12 @@ at the checkpoint before it.
       banners; arena setup; retreat rule; win/lose handling; mid-fight save and load.
 - [ ] **2.2 Terrain-event system** (first primitive: burn). Reversible, saved, reverts on
       defeat or dawn. Tests for apply/revert/save round-trip.
-- [ ] **2.3 Summoning:** altar structure, summon item, tech/previous-boss gating, UI. The
+- [ ] **2.3 Summoning:** altar structure, summon item (previous boss's drop + an automation-
+      chain component, hand-craftable at high cost), tech/previous-boss gating, UI. The
       fight can only be started at dusk. Large (3×3+) boss bodies that ignore pathing and
       smash structures; ruins and rebuild-at-reduced-cost for destroyed structures.
-- [ ] **2.4 First boss: Red** (fire). Chosen because its map interaction exercises the
+- [ ] **2.4 First boss: Red** (fire). Built first as the slice; in play it is gated as the
+      **third** boss (fixed order). Chosen because its map interaction exercises the
       terrain-event system.
 - [ ] **2.5 `--bossfight <type> [difficulty] [tower loadout]`** headless simulation, with
       recorded pass bands (e.g. "fresh turrets lose; geared turrets win in N minutes").
@@ -132,8 +136,8 @@ slice so the Red boss can be the first source of a boss set.
 
 - [ ] **2b.1 Gear and equipment:** slots (weapon, tool, 3 armour, 2 accessories), equip UI,
       stats from gear; tech-tier base gear.
-- [ ] **2b.2 Perk tree:** perk points, branches (Brawler, Marksman, Engineer/Commander,
-      Survivalist), free respec at the workbench or bed.
+- [ ] **2b.2 Perk tree:** perk points, 4 branches of about 12 (Brawler, Marksman,
+      Engineer/Commander, Survivalist), free respec at the workbench or bed.
 - [ ] **2b.3 Attunement:** perk slots on gear with named effects; player level unlocks slots
       and raises ranks; UI shows the next unlock.
 - [ ] **2b.4 Active abilities:** 2–3 with cooldowns, input, telegraph and sound; unlocked by
@@ -157,7 +161,8 @@ whether choices feel meaningful.
       flat stat points; costing; **remove per-turret XP and levels**; migration of existing
       turret saves.
 - [ ] **3.2 Targeting modes** and a tower info/upgrade panel with range display.
-- [ ] **3.3 Upgrade currency** from drops (bones, hides, boss materials).
+- [ ] **3.3 Upgrade currency:** bones and hides for early tiers, boss materials for top
+      tiers.
 - [ ] **3.4 Placement limits:** cap grows with tech tier and each further tower costs more,
       instead of the fixed 5; sell and partial refund.
 - [ ] **3.5 Fast-forward** (2×/3×) during **raids only**, with the sim stepped safely; boss
@@ -184,9 +189,13 @@ feel meaningful.
 - [ ] **4.3 Final boss (the Great Goliradile):** 5–6 phases combining all abilities,
       world-scale hazards (flood, quake, fire, ice), minion director drawing on every
       family; the escalation clock and the retreat rule tuned for the longest fight.
-- [ ] **4.4 Boss progression:** order, gating, rewards, summon items, first-kill bonuses; the
+- [ ] **4.4 Boss progression:** fixed order (Green, Yellow, Red, Blue, Pink, Brown, Purple,
+      White, Black, Final), one tech tier per boss, rewards, summon items, first-kill bonuses; the
       boss-themed gear set, attunement effects and ability for each boss; its cooked meals.
-- [ ] **4.5 Ending:** victory sequence, credits (with the dedication), endless-mode unlock.
+- [ ] **4.5 Ending:** victory sequence; credits (automatic on the first win only, replayable
+      from a main-menu button, with the dedication); **Hall of Fame** screen reading the
+      profile file; the won save is marked complete and stays playable as a free-play
+      sandbox. No endless mode.
 - [ ] **4.6 Balance pass:** all 10 bosses × 3 difficulties, using sims for ranges and
       playtests for feel.
 
@@ -241,7 +250,7 @@ factory; performance budgets hold. This is the **Beta**.
 before launch are closed: invited players on private builds.
 
 ### Phase 7 — Co-op multiplayer (8–12 weeks, after launch)
-*Goal: 2–4 players on one island.* Cheap only because Phase 0 removed single-player
+*Goal: up to 4 players on one island.* Cheap only because Phase 0 removed single-player
 assumptions.
 
 - [ ] **7.1 Networking:** host-authoritative simulation over Godot high-level networking;
@@ -310,7 +319,7 @@ so the plan keeps full scope; the checkpoints are where scope can still be cut.
 | Upgrade currency | boss and croc drops (bones, hides, boss materials); turret XP is removed |
 | Final map size | **decided: 160×160**, subject to 5a profiling |
 | Lives on Hard | **decided:** few, a lost boss fight costs progress; saves are never wiped |
-| Co-op baseline | 2–4 players; formulas in `data/difficulty` |
+| Co-op baseline | **decided: up to 4 players**; formulas in `data/difficulty` |
 | Art direction | **decided:** 16 px tiles, richer sprites, multi-tile bosses |
 | Early Access vs full launch | **decided:** full 1.0, no Early Access |
 | Price and platforms | **platforms decided:** Windows, macOS, Linux; price before the Steam page |

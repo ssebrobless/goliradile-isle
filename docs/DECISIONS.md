@@ -4,6 +4,23 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 5 (progression and endgame)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| Q1 | Boss order | Fixed, matching croc unlock order: Green, Yellow, Red, Blue, Pink, Brown, Purple, White, Black, Final | Red is built first as the slice but is the third boss in play |
+| Q2 | Tech tiers | One tier per boss (10 tiers) | `PROGRESSION.md` is organised by boss |
+| Q3 | Summon items | Previous boss's drop + an automation-chain component | **Dependency:** automation arrives after the bosses |
+| Q3b | Resolution | Hand-craftable at high cost; automation makes it cheap (and effectively required for large bosses) | Keeps the phase order; tune the hand-craft cost so it is possible but painful |
+| Q4 | 3 new towers | Repair tower, Terrain tower, Collector | `TOWERS.md` (the Lancer was not chosen) |
+| Q5 | Upgrade currency | Bones and hides for early tiers, boss materials for top tiers | 3.3 |
+| Q6 | After the final boss | Credits, then done. **No endless mode.** Credits play automatically on the first win only, and a menu button replays them | 4.5 |
+| Q6b | Hall of Fame | Main-menu screen of every win: difficulty, player count, time taken, final level and perk build, gear and tower roster, boss kill times and deaths (no base screenshot) | Stored in a profile file outside save slots (0.6b) |
+| Q7 | Completed save | Marked complete; stays playable as a free-play sandbox | No further boss scaling or goals |
+| Q8 | Perk branches | 4 branches of about 12 | 2b.2 |
+| Q9 | Co-op size | Up to 4 players | Phase 7 |
+| Q10 | Save slots | 5 | 1.1 |
+
 ## Round 4 (leftover open items)
 
 | ID | Question | Decision | Implication |
@@ -102,8 +119,9 @@ thank-you note, is the owner's call.
   answered. **`ASSETS.md`** (licence policy and manifest format) is new.
 - **Legal name for the `LICENSE`** copyright line (owner to provide).
 - **Trademark and Steam name check** for "Goliradile Isle" (owner task, early).
-- **Endless mode scaling** after the win; **co-op baseline** and formulas (Phase 7); price;
-  how playtesters get builds (private builds). None block Phase 0–2.
+- **Co-op scaling formulas** (Phase 7); **price**; how playtesters get builds (default:
+  private builds to invited players); the **hand-craft cost** of summon components. None
+  block Phase 0–2.
 - **Asset sourcing is a risk, not a decision:** open-licensed packs won't cover multi-tile
   bosses or a coherent style by themselves; expect custom work, and that licences must be
   checked per asset (no non-commercial or no-derivatives licences).
