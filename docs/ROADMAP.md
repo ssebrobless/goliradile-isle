@@ -69,15 +69,19 @@ at the checkpoint before it.
       with per-system streams (needed for tests, boss patterns, and later networking).
 - [ ] **0.6b Player profile file** (separate from the 5 save slots): Hall of Fame entries,
       credits-seen flag and settings, so deleting a save never loses them.
-- [ ] **0.6 Save v2.** Versioned format with a migration from today's save; a header
+- [ ] **0.6 Save v2.** Versioned format (**today's saves are discarded**: no migration, as
+      there are no public players yet; later releases migrate); a header
       (name, difficulty, nights, boss progress, playtime, timestamp); multiple slots; **rolling
       autosaves (last 3)** at dawn and on quit; Save & Quit works mid-night.
 - [ ] **0.7 Time constants.** Day/night lengths become data, ready for Phase 1 tuning.
+- [ ] **0.9 Inventory interface.** All reads and writes of resources and items go through an
+      `Inventory` API (has/take/add), so slots and stacks can replace the plain counts in 2b.0
+      without touching every recipe and cost check.
 - [ ] **0.8 Asset manifest.** `assets/MANIFEST` (source, author, licence, link per asset) and
       the licence policy in `docs/ASSETS.md`; a CI check that every asset file is listed.
       Credits are generated from it later.
 
-*Exit:* CI green; `soak`/`defense` numbers unchanged within tolerance; existing saves migrate.
+*Exit:* CI green; `soak`/`defense` numbers unchanged within tolerance; save v2 round-trips.
 
 ### Phase 1 — Run structure and difficulty (1–2 weeks)
 *Goal: the shape of a save.*
@@ -87,8 +91,9 @@ at the checkpoint before it.
 - [ ] **1.2 Pause menu** (Esc): resume, settings, save, save & quit to menu.
 - [ ] **1.3 Difficulty data:** the three sets of multipliers (raid size/HP/damage/speed,
       regrowth, hunger/thirst, lives, boss telegraph length) read through one config.
-- [ ] **1.4 Day length** raised to **7 minutes**; re-tune hunger, regrowth and
-      growth timers per day so the economy feels right at the new length.
+- [ ] **1.4 Day length** raised to **7 minutes**, ordinary nights about **40% (about 3
+      minutes)**; re-tune hunger, regrowth and growth timers per day so the economy feels
+      right at the new length.
 - [ ] **1.5 Balance tooling per difficulty:** `--balance` and `--defense` take a difficulty
       and report the curve; recorded as new baselines.
 - [ ] **1.6 Playtime tracking** shown in the slot list.
@@ -96,6 +101,9 @@ at the checkpoint before it.
 - [ ] **1.9 XP sharing and level cap:** the player earns XP from all kills (tower kills at a
       reduced rate), turret XP removed, level cap 65, stat caps retuned. (Turret levels are
       removed fully in 3.1; this lands the player side early.)
+- [ ] **1.8b Lives and death:** lives per night or boss fight (Easy 5, Normal 3, Hard 2),
+      reset each; Normal drops about 25% of carried materials at the death spot (recoverable);
+      Easy cheaper, Hard harsher; sleeping rules (bed, hunger cost, not during a raid).
 - [ ] **1.8 Threat anchor:** raid strength driven by bosses defeated plus capped day creep
       (replaces nights survived); death policy per difficulty (never wipes a save; lives per
       night/boss, inventory loss on Normal); difficulty lowerable after creation.
@@ -134,6 +142,9 @@ nine more.
 *Goal: the player is worth playing, and boss gear has somewhere to land.* Runs after the boss
 slice so the Red boss can be the first source of a boss set.
 
+- [ ] **2b.0 Inventory rework:** slot-based inventory with stacks and storage chests on top of
+      the Phase 0.9 inventory interface; crafting stations per tier; build caps that grow
+      with tech tier and act as a performance guard.
 - [ ] **2b.1 Gear and equipment:** slots (weapon, tool, 3 armour, 2 accessories), equip UI,
       stats from gear; tech-tier base gear.
 - [ ] **2b.2 Perk tree:** perk points, 4 branches of about 12 (Brawler, Marksman,
@@ -220,6 +231,9 @@ ships on its own.
       capacity and load; brown-outs.
 - [ ] **5d Quality of life:** minimap and map, blueprint copy/paste, search in menus.
 - [ ] **5e Rebalance** raids, bosses and economy for the larger world and automation.
+- [ ] **5f Biomes and weather:** the five biomes (jungle, rocky highlands, swamp, frozen cove,
+      volcano) with their ores and materials, and a few weather events (rain, storm, fog);
+      no seasons.
 
 *Exit / checkpoint E:* the owner can run a long Hard save on the larger map with a working
 factory; performance budgets hold. This is the **Beta**.

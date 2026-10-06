@@ -4,6 +4,23 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 7 (rules and world; gaps found by rereading the plan)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| W1 | Biomes | Five themed to the bosses: jungle (start), rocky highlands, swamp, frozen cove, volcano | 5f; each boss tier maps to a biome (`PROGRESSION.md`) |
+| W2 | Weather | A few events, no seasons | 5f |
+| W3 | Daytime threats | Day stays safe | |
+| W4 | Night length | **About 40% (about 3 minutes)** (owner's choice, not the recommended 30%) | 1.4; more room for bigger raids, less building time per day |
+| W5 | Inventory | Slot-based with stacks and chests | New 2b.0; Phase 0.9 adds an inventory interface first |
+| W6 | Build limits | Caps grow with tech tier; a performance guard, not a design limit | 2b.0 |
+| W7 | Death penalty | Normal drops about 25% of carried materials at the death spot, recoverable | 1.8b |
+| W8 | Lives | Easy 5, Normal 3, Hard 2, per night or boss fight | 1.8b |
+| W9 | Crafting | Stations per tier | Station markers of progress; `PROGRESSION.md` |
+| W10 | Old saves | Discarded (no migration) | Simplifies 0.6 |
+| W11 | Sleeping | Needs a bed; costs about a day's food and water; not during a raid; all players in co-op | 1.8b |
+| W12 | Co-op looks | Palette-swapped gorillas with player names | Phase 7 |
+
 ## Round 6 (business, scope edges)
 
 | ID | Question | Decision | Implication |

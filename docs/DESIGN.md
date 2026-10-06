@@ -47,8 +47,12 @@ Multiplayer). Before 1.0, only closed playtests with invited players.
 - A save is created with a **name, a difficulty and a world seed**. Saves are slots; the
   player picks which to resume. Quit-and-resume works at any moment, including mid-night
   and mid-boss.
-- Days are **7 minutes** (today's 165 s is placeholder). Beds let the player **sleep to skip
-  the rest of the day** (at a hunger cost) so long multi-day runs have no dead time.
+- Days are **7 minutes** (today's 165 s is placeholder), and an ordinary **night is about 40%
+  of the cycle, roughly 3 minutes** (today about 29%). Boss nights are separate and longer.
+  **Daytime stays safe.**
+- **Sleeping:** a **bed** lets the player skip the rest of the day. It costs about a day's
+  worth of food and water, is not allowed during a raid, and in co-op every player must be
+  in bed.
 - **Rolling autosaves** (the last 3) at every dawn and on quit, plus manual saves any time.
   A bad autosave is never the only copy.
 - **5 save slots.**
@@ -69,9 +73,11 @@ Blue, Pink, Brown, Purple, White, Black, then the Final. **One tech tier per bos
 beating a boss unlocks the next tier of gear, towers, automation and meals.
 
 ### Death and game over
-A save is **never wiped** by dying. Lives apply per night or boss fight, not per run:
-Easy has cheap respawns, Normal costs you part of your inventory, Hard gives few lives and a
-lost boss fight costs real progress. A wipe-on-death "Hardcore" mode may be added later.
+A save is **never wiped** by dying. Lives apply per night or boss fight, not per run, and
+reset for each: **Easy 5, Normal 3, Hard 2**. Dying on Normal drops about **25% of carried
+materials at the death spot, recoverable**; Easy is cheaper, Hard harsher, and a lost boss
+fight on Hard costs real progress. Equipped gear and the base are never lost. A wipe-on-death
+"Hardcore" mode may be added later.
 
 ### Threat scaling
 Raid strength is anchored to **progress, not the calendar**: bosses defeated sets the
@@ -91,7 +97,7 @@ starting targets; `data/difficulty` owns the real values.
 | Who it's for | has the controls and mechanics | genre fans | planners who enjoy losing a night |
 | Raid size / HP / damage | low | baseline | high |
 | Resource regrowth, hunger, thirst | forgiving | baseline | scarce, faster drain |
-| Lives | generous | 3 | few; a lost boss fight costs real progress |
+| Lives (per night or boss fight) | 5 | 3 | 2; a lost boss fight costs real progress |
 | Boss telegraphs | long | baseline | short |
 | Active meal buffs (slots) | 5 | 4 | 3 |
 | Boss retreat if you stall | yes | yes | yes, but it comes back stronger |
@@ -150,6 +156,25 @@ them, so neither replaces the other. Numbers below are starting proposals for tu
 - **Difficulty and player power.** Enemies scale with difficulty; player power (levels, gear,
   perks) is the same everywhere. The one deliberate exception is the number of active meal
   buffs above.
+
+## Inventory, building and crafting
+
+- **Slot-based inventory** with stacks and storage chests (today: unlimited counts per
+  resource). Gear, meals and many materials need it, and the limit gives storage and
+  automation a purpose.
+- **Build limits** (80 structural blocks and 10 traps today) **grow with tech tier**; they are
+  a performance safety net, not a design limit. Tower limits are separate (see Towers).
+- **Crafting stations per tier** (workbench, kiln, forge and so on): recipes need the right
+  station nearby, so stations are the visible markers of progress.
+
+## World
+
+- **160×160** with **five biomes themed to the bosses**: jungle (start), rocky highlands,
+  swamp, frozen cove, volcano. Later biomes supply the ores and materials for a boss tier
+  (swamp: purple, frozen cove: blue, volcano: red) and give exploration a purpose.
+- **A few weather events, no seasons** (for example rain waters crops and refills barrels;
+  storms and fog change raids).
+- Daytime is safe; danger comes from nights and bosses.
 
 ## Core loop systems (existing)
 
@@ -251,7 +276,7 @@ Not a full Factorio. Enough that building a supply chain is a real, satisfying p
 
 ## Multiplayer (post-launch)
 
-Host-authoritative co-op over Godot's high-level networking, **up to 4 players**. It is not
+Host-authoritative co-op over Godot's high-level networking, **up to 4 players**. Players are palette-swapped gorillas with player names. It is not
 built until after single-player launch, but **no new system may assume a single player**:
 state is per-player (`players` list), enemies target the nearest player, randomness goes
 through a seeded service, and **all player actions go through a command queue** (so
