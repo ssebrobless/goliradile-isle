@@ -139,6 +139,9 @@ night (target 6–10 minutes), inspired by Terraria: telegraphed attacks, distin
 minions, and a boss that reshapes the map.
 
 ### Anatomy of a boss night
+- **If the player dies mid-fight** they respawn at base and rejoin; the fight resets only when
+  lives run out (the boss then retreats).
+- **Minions:** up to **60 or more** on screen. That is a performance target (see ROADMAP).
 - **Summoned**, not scheduled. The player builds a summoning altar and crafts a summon item
   from late-tier materials, so *they* choose which night to fight. The fight can only be
   **started at dusk**, so players prepare by day (and sleep to dusk when ready). Each boss is
@@ -172,7 +175,7 @@ minions, and a boss that reshapes the map.
 | Purple | poison | corrupts grass, kills planters |
 | White | heals, shields | shields the boss and minions; cleanses debuffs |
 | Black | revives | brings back dead minions; darkens the map |
-| **Final: the Great Goliradile** | all of the above, in sequence | floods the island, quakes, burns, freezes; 5–6 phases |
+| **Final: the Great Goliradile** | all of the above, in sequence | floods the island, quakes, burns, freezes; about 6 phases, each themed on one croc type's power, ending in a combined finale |
 
 Map effects are built once as a **terrain-event system** (burn, freeze, flood, quake,
 corrupt, darken): events apply a reversible change to tiles, are saved with the game, and
@@ -184,12 +187,19 @@ revert on defeat or at dawn. Bosses use the system; they don't edit tiles direct
   cross-path cap so a tower specialises. **Per-turret XP and levels are removed**; kills fund
   upgrades through drops instead.
 - **Targeting modes:** first, last, strongest, closest (plus tower-specific modes).
-- **Placement limits** come from tech and difficulty instead of the fixed cap of 5.
+- **Placement limits:** the cap **grows with tech tier** and the cost of each further tower
+  rises, instead of the fixed cap of 5, so early game stays tight and spamming one tower is
+  expensive.
 - **Upgrade currency:** boss and croc drops (bones, hides, boss materials), so killing
   things funds defence.
 - Sell with a partial refund. A tower info panel shows range, targeting and path state.
-- **Fast-forward** (2×/3×) during raids, as in Bloons.
-- Roughly 12–15 tower types at launch (9 exist now).
+- **Fast-forward** (2×/3×) during **raids only**; boss fights run at normal speed because their
+  telegraphs and phase changes are timed for it.
+- **12 tower types at launch** (the 9 existing plus 3 new).
+- **Upgrade structure:** 3 paths per tower, **4 tiers per path**, cross-path cap **4/2/0**
+  (top out one path, take a second partway, never all three).
+- **Supply:** one idea covers fuel and ammo (wine, oil or ammo). It is hand-fed early; the
+  automation phase adds feeders that deliver it.
 
 ## Automation (the Factorio side — "lite")
 
@@ -198,8 +208,15 @@ Not a full Factorio. Enough that building a supply chain is a real, satisfying p
   deliver ammo and fuel to towers.
 - A power grid with capacity and load (generators and wires exist today).
 - Quality of life: minimap, copy/paste of a blueprint, clear production/throughput readouts.
-- Needs a **bigger map with biomes and ore** (today 50×50; target about 128–200 square) and
-  chunked simulation so the cost doesn't grow with world size.
+- Needs a **bigger map with biomes and ore** (today 50×50; target **160×160**) and chunked
+  simulation so the cost doesn't grow with world size. Measured on today's code, the croc
+  path rebuild (5.3 ms) and world tick (1.1 ms) would grow about 10× at that size, so they
+  must be bounded and chunked first.
+- **MVP chain:** miner, belt, smelter, ammo assembler, feeder, power. More machines can come
+  after launch.
+- **Night clearing** applies only near the base; wild areas keep their trees and rocks.
+- **Raids** spawn at the map edge or water and march in along set fronts the player can scout
+  and defend.
 
 ## Multiplayer (post-launch)
 
@@ -211,14 +228,24 @@ single-player uses the same path co-op will). See ROADMAP Phase 0 and Phase 7.
 
 ## Art, audio, UX (launch requirements)
 
-- Original or properly licensed art, sprites, tiles and animation; no placeholder
-  procedural art in the shipped game. **Tiles stay 16 px**, with richer sprites; bosses are
-  drawn as multi-tile 16 px sprites.
-- Original or licensed audio: sound effects, per-biome and per-boss music.
+- **Art and audio come from open-licensed assets, credited in the game's end credits.** No
+  placeholder procedural art in the shipped game. **Tiles stay 16 px**, with richer sprites;
+  bosses are drawn as multi-tile 16 px sprites (these will likely need custom or edited
+  work, since packs rarely have them).
+- Licence policy (full detail in `docs/ASSETS.md` when written): allowed are CC0, CC-BY and
+  permissive licences such as MIT/OFL; **not allowed** are non-commercial (NC) and no-
+  derivatives (ND) licences, and share-alike (SA) only after a licence check. Every asset
+  is recorded in a manifest (source, author, licence, link) from day one, and the end
+  credits are generated from it.
+- Risk to manage: assets from many artists look inconsistent, so prefer one or two coherent
+  16 px packs and edit the rest to match.
+- Audio: free open-licensed music and sound effects under the same policy and manifest;
+  music is calm by day, tense by night, with unique boss tracks where available.
 - Onboarding: a guided first day that teaches controls and the loop.
 - Accessibility: rebindable keys, text scaling, colour-blind-safe cues, screen-shake and
   flash toggles.
-- Controller support is a stretch goal (needed for Steam Deck).
+- Keyboard and mouse at launch; **controller support comes after launch** (a separate UI
+  project, also needed for a verified Steam Deck release).
 - Strings are kept in one place so localisation is possible later.
 
 ## Technical principles
@@ -230,4 +257,6 @@ single-player uses the same path co-op will). See ROADMAP Phase 0 and Phase 7.
   and later `--bossfight`) back balance decisions with numbers, but only human playtests
   judge feel.
 - **Save compatibility:** saves are versioned and migrated; a released save never breaks.
-- Original names, art and audio only. "Inspired by" does not mean copied.
+- Original names and gameplay; art and audio are open-licensed and credited (see above).
+  "Inspired by" does not mean copied. The name **Goliradile Isle** is kept; a trademark and
+  Steam name check is an early task for the owner.

@@ -4,6 +4,27 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 4 (leftover open items)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| F1 | Tower paths | 3 paths × 4 tiers, cross-path cap 4/2/0 | Phase 3.6 |
+| F2 | Roster | 12 types (9 existing + 3 new) | Roles go in `TOWERS.md` |
+| F3 | Supply | One "supply" idea (wine, oil, ammo): hand-fed early, belts later | 3.9, 5c |
+| F4 | Tower limit | Cap grows with tech tier; costs rise per tower | 3.4 |
+| E4 | Death during a boss | Respawn at base and rejoin; fight resets only when lives run out | 2.7 |
+| E5 | Minion cap | **60 or more** (owner's choice) | Performance work: spatial grid, profiling gate (2.7) |
+| E6 | Final boss | About 6 phases, each themed on one croc type, ending combined | Reuses earlier terrain events |
+| F5 | Fast-forward | Raids only; bosses at normal speed | 3.5 |
+| G1 | Map size | **160×160** (owner's choice) | Works only with 5a: path rebuild, world tick and swaps must be bounded and chunked (measured) |
+| G2 | Automation | MVP: miner, belt, smelter, ammo assembler, feeder, power | 5b, 5c |
+| G3 | Night clearing | Near the base only; wild areas stay | 5a |
+| G4 | Raid routes | Spawn at the map edge or water, march along set fronts | 5a, tower placement |
+| I2 | Art | **Open-licensed assets, credited in the end credits** (owner's choice) | Licence policy, manifest from Phase 0.8, credits screen; boss sprites will need custom work |
+| I3 | Audio | **Free open-licensed music and sound, credited in the end credits** (owner's choice) | Same manifest and policy |
+| I4 | Controller | Keyboard and mouse at launch; controller after launch | Removed from Phase 6 |
+| N1 | Name | Keep "Goliradile Isle"; run a trademark and Steam name check now | Owner task |
+
 ## Round 3 (open items)
 
 | ID | Question | Decision | Implication |
@@ -76,7 +97,15 @@ thank-you note, is the owner's call.
 - **PR #1 (`will-bogusz`).** Resolved above: not merging, owner decides whether to close it. If
   anyone other than the owner ever contributes code, a simple contributor agreement is needed
   before a commercial release.
-- **`PROGRESSION.md`** (tiers, boss order, materials) and **`TOWERS.md`** (roles, upgrade
-  paths) still to be written; D2 blocks part of the first.
+- **`PROGRESSION.md`** (tiers, boss order, materials) and **`TOWERS.md`** (roles for the 12
+  towers, upgrade paths) still to be written; the design questions that blocked them are now
+  answered. **`ASSETS.md`** (licence policy and manifest format) is new.
+- **Legal name for the `LICENSE`** copyright line (owner to provide).
+- **Trademark and Steam name check** for "Goliradile Isle" (owner task, early).
+- **Endless mode scaling** after the win; **co-op baseline** and formulas (Phase 7); price;
+  how playtesters get builds (private builds). None block Phase 0–2.
+- **Asset sourcing is a risk, not a decision:** open-licensed packs won't cover multi-tile
+  bosses or a coherent style by themselves; expect custom work, and that licences must be
+  checked per asset (no non-commercial or no-derivatives licences).
 - Remaining items marked in `ROADMAP.md` "Decisions we still need": price and platforms, name
   and trademark, Early Access versus full launch, co-op baseline.

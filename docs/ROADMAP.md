@@ -71,6 +71,9 @@ at the checkpoint before it.
       (name, difficulty, nights, boss progress, playtime, timestamp); multiple slots; **rolling
       autosaves (last 3)** at dawn and on quit; Save & Quit works mid-night.
 - [ ] **0.7 Time constants.** Day/night lengths become data, ready for Phase 1 tuning.
+- [ ] **0.8 Asset manifest.** `assets/MANIFEST` (source, author, licence, link per asset) and
+      the licence policy in `docs/ASSETS.md`; a CI check that every asset file is listed.
+      Credits are generated from it later.
 
 *Exit:* CI green; `soak`/`defense` numbers unchanged within tolerance; existing saves migrate.
 
@@ -114,6 +117,10 @@ at the checkpoint before it.
 - [ ] **2.5 `--bossfight <type> [difficulty] [tower loadout]`** headless simulation, with
       recorded pass bands (e.g. "fresh turrets lose; geared turrets win in N minutes").
 - [ ] **2.6 Boss audio/visual cues** (placeholder quality is fine until Phase 6).
+- [ ] **2.7 Scale to 60+ minions.** Spatial grid for separation and targeting (separation is
+      O(n²) today), cheaper per-croc updates, profiling gate in CI (the `--soak` and
+      `--bossfight` tools report per-frame cost at 60+). Dying mid-fight: respawn at base and
+      rejoin; the fight resets only when lives run out.
 
 *Exit / checkpoint B (first external playtest):* the Red boss is beatable on Normal at the
 intended tech level, readable, and fun; owner signs off the fight structure before we build
@@ -151,11 +158,14 @@ whether choices feel meaningful.
       turret saves.
 - [ ] **3.2 Targeting modes** and a tower info/upgrade panel with range display.
 - [ ] **3.3 Upgrade currency** from drops (bones, hides, boss materials).
-- [ ] **3.4 Placement limits** from tech and difficulty instead of the fixed 5; sell and
-      partial refund.
-- [ ] **3.5 Fast-forward** (2×/3×) during raids, with the sim stepped safely.
-- [ ] **3.6 New towers** to reach about 12–15 types, each with a distinct role against the
-      croc and boss roster.
+- [ ] **3.4 Placement limits:** cap grows with tech tier and each further tower costs more,
+      instead of the fixed 5; sell and partial refund.
+- [ ] **3.5 Fast-forward** (2×/3×) during **raids only**, with the sim stepped safely; boss
+      fights stay at normal speed.
+- [ ] **3.6 New towers:** 3 new (12 types in total), each with a distinct role against the
+      croc and boss roster. Upgrade paths are **3 paths × 4 tiers, cross-path cap 4/2/0**.
+- [ ] **3.9 Supply:** one fuel/ammo concept (wine, oil, ammo), hand-fed now; feeders arrive
+      in 5c.
 - [ ] **3.7 Re-baseline `--defense`** for the new system.
 - [ ] **3.8 Player-to-tower buffs:** perks and gear that buff nearby towers (aura range,
       fire rate), tuned with the tower paths.
@@ -187,9 +197,14 @@ This is the **Alpha**.
 *Goal: a base worth building.* The largest and riskiest phase; it is split so each part
 ships on its own.
 
-- [ ] **5a World scale (do first).** Larger map (128–200 square) with biomes and ore
-      deposits; chunked simulation; spatial indexes; world-gen rework. Must hold the
-      performance budgets before anything else is built on it. Save migration.
+- [ ] **5a World scale (do first).** Map of **160×160** with biomes and ore deposits; chunked
+      simulation; spatial indexes; world-gen rework. Measured costs on the 50×50 map that
+      would grow about 10×: croc path rebuild 5.3 ms (bound it to a radius and use coarse
+      chunk-level routing for long marches), world growth tick 1.1 ms (spread over chunks),
+      structure scan 0.12 ms per pink croc (cache it), night/day swap 7 ms (only near the
+      base). Night clearing applies only near the base. Raids spawn at the edge or water and
+      march in along fronts. Must hold the performance budgets before anything else is built
+      on it. Save migration.
 - [ ] **5b Production chains:** miners, conveyor belts, smelters/assemblers with recipes,
       item flow and throughput readouts.
 - [ ] **5c Supply logistics:** feeders that deliver ammo and fuel to towers; power grid with
@@ -204,11 +219,14 @@ factory; performance budgets hold. This is the **Beta**.
 *Goal: something strangers will pay for.* Several items run in parallel from earlier phases.
 
 - [ ] **6.1 Onboarding:** guided first day and contextual hints.
-- [ ] **6.2 Art:** original sprite sheets, tileset, animation, UI skin; replace the procedural
-      placeholder art. (Likely commissioned or licensed; budget and asset pipeline needed.)
-- [ ] **6.3 Audio:** original sound effects; per-biome and per-boss music.
+- [ ] **6.2 Art:** curate open-licensed 16 px packs (CC0/CC-BY/permissive; no NC/ND), edit them
+      into one coherent look, make the multi-tile boss sprites, replace the procedural
+      placeholder art; every asset in the manifest.
+- [ ] **6.3 Audio:** open-licensed sound effects and music (calm day, tense night, boss
+      tracks), under the same policy and manifest.
+- [ ] **6.3b Credits:** end-credits screen generated from the manifest (plus the dedication).
 - [ ] **6.4 UX and accessibility:** rebindable keys, text scaling, colour-blind-safe cues,
-      screen-shake and flash toggles, controller support (Steam Deck), clear settings.
+      screen-shake and flash toggles, clear settings. (Controller support is post-launch.)
 - [ ] **6.5 Localisation-ready strings.**
 - [ ] **6.6 Achievements and Steam integration.**
 - [ ] **6.7 Performance and min-spec pass;** crash and error logging.
@@ -290,7 +308,7 @@ so the plan keeps full scope; the checkpoints are where scope can still be cut.
 |---|---|
 | Day length | **decided: 7 min**, tuned in Phase 1 |
 | Upgrade currency | boss and croc drops (bones, hides, boss materials); turret XP is removed |
-| Final map size | about 128 square; revisit after 5a profiling |
+| Final map size | **decided: 160×160**, subject to 5a profiling |
 | Lives on Hard | **decided:** few, a lost boss fight costs progress; saves are never wiped |
 | Co-op baseline | 2–4 players; formulas in `data/difficulty` |
 | Art direction | **decided:** 16 px tiles, richer sprites, multi-tile bosses |
