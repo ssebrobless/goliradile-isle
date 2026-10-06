@@ -26,8 +26,9 @@ The run ends when you beat the final boss.
 4. **Comedy in the tech.** Junk machines, dry item names, a gorilla who takes it seriously.
 
 ### Audience and sales
-Public release, sold (target: Steam, Early Access first). Windows, macOS, Linux; Steam Deck
-as a stretch goal. Single-player first; co-op after launch (see Multiplayer).
+Public release, sold (target: Steam). **A full 1.0 launch, no Early Access.** Windows, macOS
+and Linux; Steam Deck as a stretch goal. Single-player first; co-op after launch (see
+Multiplayer). Before 1.0, only closed playtests with invited players.
 
 ## Run structure
 
@@ -66,6 +67,7 @@ starting targets; `data/difficulty` owns the real values.
 | Resource regrowth, hunger, thirst | forgiving | baseline | scarce, faster drain |
 | Lives | generous | 3 | few; a lost boss fight costs real progress |
 | Boss telegraphs | long | baseline | short |
+| Active meal buffs (slots) | 5 | 4 | 3 |
 | Boss retreat if you stall | yes | yes | yes, but it comes back stronger |
 
 Difficulty is **fixed when the save is created, but can be lowered later** (never raised).
@@ -86,32 +88,42 @@ them, so neither replaces the other. Numbers below are starting proposals for tu
 - **Role: hybrid.** The player is a strong fighter and the towers hold the base. Boss fights
   need both: towers handle waves and chip damage; the player dodges, bursts and uses
   abilities. Neither can carry a boss alone.
-- **Levels 1–65.** Each level grants a stat point (the five stats: health, attack, speed,
-  armor, regen) and perk points (proposal: a perk point every level or two). Per-stat caps
-  are revisited for the lower level cap. Levels beyond the cap are not needed; late power
-  comes from gear and perk depth.
-- **Perk tree.** Free-form branches themed by playstyle (Brawler, Marksman,
-  Engineer/Commander, Survivalist). Any mix is allowed; there are no classes.
+- **Levels 1–65.** Each level grants a **stat point** (the five stats: health, attack, speed,
+  armor, regen), each stat capped at **30**, so 65 points fill two stats and part of a third
+  and you must choose a shape. A **perk point every 2 levels** (about 32 in total).
+  Late power comes from gear and perk depth.
+- **Perk tree.** About **48 perks** in free-form branches themed by playstyle (Brawler,
+  Marksman, Engineer/Commander, Survivalist), so a player buys about two thirds of the tree.
+  Any mix is allowed; there are no classes.
 - **Gear slots:** weapon, tool, 3 armour pieces, 2 accessories.
 - **Gear sources:** tech-tier base gear from your tier of the progression; **boss-themed
   sets** crafted from boss materials, each tied to its croc type (for example the Red set
   resists fire, the Brown set resists being undermined).
 - **Attunement (how levels and gear interact).** Each piece of gear has perk slots with named
   effects (for example "Ember"). Player level **unlocks additional slots and raises the rank**
-  of the effects, so the gear gives the effect and the level gives the depth. The UI shows
-  which level unlocks the next slot or rank.
-- **Active abilities.** Two or three abilities with cooldowns (dodge, slam, throw and so on),
-  unlocked by level and gear. Each boss set adds one ability.
+  of the effects, so the gear gives the effect and the level gives the depth: the **2nd slot
+  at level 15, the 3rd at level 35, and ranks every 10 levels**. The UI shows which level
+  unlocks the next slot or rank.
+- **Active abilities.** Two or three abilities with cooldowns, unlocked by level and gear.
+  The first two are **Dodge roll** (short dash with brief invulnerability) and **War cry**
+  (briefly buffs nearby towers). Other abilities, such as Ground slam and Banana throw
+  (a ranged arc that leaves a peel), are reserved for boss sets: each boss set adds one.
 - **Tower buffs.** Player perks and gear can buff nearby towers (for example an aura that
-  raises fire rate), tying the two halves of the game together.
+  raises fire rate), tying the two halves of the game together. The aura reaches **about
+  5 tiles**; buffs from several sources stack up to a cap.
 - **XP.** The player earns XP from **all** kills; kills made by towers pay at a reduced rate.
   Bosses and milestones add bonuses. Turrets no longer level.
 - **Respec** is free at the workbench or bed, so players can retune for a specific boss.
 - **Food buffs.** Cooking grows into a wide set of **cooked meals, each with a unique timed
   buff**, like potions in Terraria (for example fire resistance, regeneration, faster
   gathering, tower-aura range). Meals are how a player prepares for a boss, and they give the
-  existing cooking, fish, honey and farming systems a late-game role. Stacking rules and
-  durations are still to be designed.
+  existing cooking, fish, honey and farming systems a late-game role.
+  - About **20 meals across 4 tiers**. Raw ingredients spoil; cooked meals keep.
+  - Each buff lasts **5–10 minutes**. The number of meals active at once is **5 on Easy, 4 on
+    Normal, 3 on Hard**; eating one more replaces the oldest.
+- **Difficulty and player power.** Enemies scale with difficulty; player power (levels, gear,
+  perks) is the same everywhere. The one deliberate exception is the number of active meal
+  buffs above.
 
 ## Core loop systems (existing)
 

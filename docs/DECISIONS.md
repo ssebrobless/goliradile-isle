@@ -4,6 +4,23 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 3 (open items)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| P13 | Perk tree size and rate | ~48 perks; a perk point every 2 levels (~32) | Real choices; free respec is meaningful |
+| P14 | Stat cap | 30 per stat | 65 points fill two stats and part of a third |
+| P15 | Attunement | 2nd slot at level 15, 3rd at 35, ranks every 10 levels | UI shows the next unlock |
+| P16 | First abilities | Dodge roll and War cry; Ground slam and Banana throw reserved for boss sets | 2b.4 builds two abilities first |
+| P17 | Buff rules | 5-10 minute buffs; active meals 5 (Easy), 4 (Normal), 3 (Hard); replace oldest | Meal slots are a difficulty setting (see below) |
+| P18 | Meals | ~20 meals across 4 tiers; raw ingredients spoil, cooked meals keep | 2b.6 starts the set; grows in Phases 4 and 6 |
+| P19 | Tower aura | About 5 tiles; sources stack up to a cap | Stack cap value to tune |
+| P20 | Difficulty and player power | Same player power everywhere; enemies scale | **Exception:** meal slots differ by difficulty (P17), deliberately |
+| R1 | PR #1 | Closed without a comment | Done |
+| R2 | Repo visibility | Keep public until the first public build | See "Open" for the consequence |
+| R3 | First release | Full 1.0 only, no Early Access | Plan keeps full scope; playtests are closed/private |
+| R4 | Platforms | Windows, macOS, Linux | macOS needs signing and notarisation (Apple developer account) |
+
 ## Round 2 (player power)
 
 | ID | Question | Decision | Implication |
@@ -46,15 +63,16 @@ thank-you note, is the owner's call.
 
 ## Open
 
-- **Player power details** (the direction is decided; these numbers and lists are not): perk
-  tree layout and size; perk-point rate per level; per-stat caps with the cap of 65;
-  attunement thresholds (which levels unlock slots and ranks); the ability list; the cooked
-  meal list; buff stacking, duration and whether a meal spoils; the aura radius for tower
-  buffs; how player power scales with difficulty. These go in `PLAYER.md` before Phase 2b.
-- **J1 Repository visibility.** The repo is **public** and has been forked once. For a game that
-  will be sold, recommend **private**. Making it private detaches existing public forks, which
-  stay public with whatever code they already copied; the proprietary licence applies from now
-  on but does not recall earlier copies. Owner to decide, then change the setting on GitHub.
+- **Player power content** (the rules are decided in `DESIGN.md`; the lists are not): the 48
+  perks and their branches; the named gear effects and per-rank values; the ~20 meals and
+  their buffs; ability numbers (cooldowns, durations); the aura stack cap. These go in
+  `PLAYER.md` before Phase 2b, and are tuned by playtest.
+- **Repository visibility (decided: public until the first public build).** Consequence to keep
+  in mind: with no Early Access, the first public build is the 1.0 launch, possibly years away,
+  so design docs, boss ideas and later art and audio will be visible in the meantime, and the
+  proprietary licence does not stop people reading them. Revisit before committing art or
+  audio assets or anything the owner wants unreleased; making the repo private is a GitHub
+  setting only the owner can change.
 - **PR #1 (`will-bogusz`).** Resolved above: not merging, owner decides whether to close it. If
   anyone other than the owner ever contributes code, a simple contributor agreement is needed
   before a commercial release.

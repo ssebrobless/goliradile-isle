@@ -216,10 +216,11 @@ factory; performance budgets hold. This is the **Beta**.
       pipeline.
 - [ ] **6.9 Store and legal:** Steam page (capsule art, trailer, description), EULA/privacy,
       third-party licence audit, trademark check on the name.
-- [ ] **6.10 Test rounds:** closed alpha with friends, then public beta or demo; balance
-      passes per difficulty from real data.
+- [ ] **6.10 Test rounds:** closed playtests with invited players on private builds; balance
+      passes per difficulty from real data. (No public Early Access.)
 
-*Exit:* **Early Access launch** (single-player). Then iterate on feedback toward **1.0**.
+*Exit:* **1.0 launch** (single-player, no Early Access). Co-op follows in Phase 7. Playtests
+before launch are closed: invited players on private builds.
 
 ### Phase 7 — Co-op multiplayer (8–12 weeks, after launch)
 *Goal: 2–4 players on one island.* Cheap only because Phase 0 removed single-player
@@ -247,14 +248,14 @@ assumptions.
 | Player power | Phase 2b | gear, perks, attunement, abilities, buffs, first boss set |
 | Alpha | Phase 4 | all 10 bosses; a run can be won |
 | Beta | Phase 5 | automation and the larger world |
-| Early Access | Phase 6 | art, audio, tutorial, builds, Steam |
+| 1.0 launch | Phase 6 | art, audio, tutorial, builds, Steam; no Early Access |
 | Co-op | Phase 7 | multiplayer and player scaling |
 
-Rough total to Early Access: **10–16 months of focused work**. At the stated pace
+Rough total to the 1.0 launch: **10–16 months of focused work**. At the stated pace
 (**evenings and weekends, roughly 5–10 hours a week**, no fixed date) calendar time is
 several times longer, plausibly **2–3 years**. Treat it as a range to plan around, not a
-promise; the checkpoints exist to re-plan. If an earlier public build matters, the lever is
-a **smaller first release** (fewer bosses, no automation), not working faster.
+promise; the checkpoints exist to re-plan. The owner chose a full 1.0 with no Early Access,
+so the plan keeps full scope; the checkpoints are where scope can still be cut.
 
 ## Dependencies
 
@@ -293,8 +294,8 @@ a **smaller first release** (fewer bosses, no automation), not working faster.
 | Lives on Hard | **decided:** few, a lost boss fight costs progress; saves are never wiped |
 | Co-op baseline | 2–4 players; formulas in `data/difficulty` |
 | Art direction | **decided:** 16 px tiles, richer sprites, multi-tile bosses |
-| Early Access vs full launch | Early Access after Phase 6 |
-| Price and platforms | decide before the Steam page; Windows/macOS/Linux |
+| Early Access vs full launch | **decided:** full 1.0, no Early Access |
+| Price and platforms | **platforms decided:** Windows, macOS, Linux; price before the Steam page |
 | Final name | trademark check before the Steam page |
 
 ## Next step
