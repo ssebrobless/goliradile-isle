@@ -1,0 +1,163 @@
+# Goliradile Isle — Design
+
+The reference for *what* we are building. `ROADMAP.md` says *how and in what order*.
+When the two disagree, update both in the same PR.
+
+*For William.* (The dedication stays in the game.)
+
+## Vision
+
+A commercial 2D game that is a hybrid of a **tower-defense game** (Bloons TD6: tower
+upgrade paths, targeting, escalating rounds) and a **survival-crafting game** (Terraria,
+Don't Starve Together, Factorio: gather, build a base, automate, fight bosses).
+
+You are a gorilla on a crocodile-infested island. By day you gather, build and automate.
+By night the crocodiles come, and your base, towers and factory have to hold. Recognisable
+machines (generators, filters, refineries) are rebuilt out of jungle junk for comic effect.
+The run ends when you beat the final boss.
+
+### Pillars
+1. **Gather → Automate → Defend → Boss.** Every system feeds the next. A factory exists
+   because towers need supplies; towers exist because bosses need answers.
+2. **Planning is the game.** Long runs, pausing and quitting anywhere, and nights you can
+   prepare for. Pressure comes from what's coming, not from reflex alone.
+3. **Readable chaos.** Hordes look like hordes; boss attacks are telegraphed; losses are
+   explainable ("my fire defences were weak to the blue boss").
+4. **Comedy in the tech.** Junk machines, dry item names, a gorilla who takes it seriously.
+
+### Audience and sales
+Public release, sold (target: Steam, Early Access first). Windows, macOS, Linux; Steam Deck
+as a stretch goal. Single-player first; co-op after launch (see Multiplayer).
+
+## Run structure
+
+- A save is created with a **name, a difficulty and a world seed**. Saves are slots; the
+  player picks which to resume. Quit-and-resume works at any moment, including mid-night
+  and mid-boss.
+- Days are long enough to plan in (target 6–8 minutes; today's 165 s is placeholder).
+- Autosave at every dawn and on quit; manual save any time.
+- The run is won by defeating the **final boss**. After that, an endless mode continues
+  the same save.
+
+### Difficulties
+
+Every difficulty has the same 10 boss fights and the same content. They differ in how much
+preparation each fight demands and how hard the world pushes in between. Numbers below are
+starting targets; `data/difficulty` owns the real values.
+
+| | Easy | Normal | Hard |
+|---|---|---|---|
+| Target run length | one evening (3–5 h) | 10–15 h over several sittings | 25–40 h across days |
+| Who it's for | has the controls and mechanics | genre fans | planners who enjoy losing a night |
+| Raid size / HP / damage | low | baseline | high |
+| Resource regrowth, hunger, thirst | forgiving | baseline | scarce, faster drain |
+| Lives | generous | 3 | few; a lost boss fight costs real progress |
+| Boss telegraphs | long | baseline | short |
+| Boss retreat if you stall | yes | yes | yes, but it comes back stronger |
+
+### Player-count scaling (co-op)
+Difficulty scales separately by the number of players, so a 4-player Normal is not just
+"Normal with more HP". Per additional player: raids grow in number first (capped), then in
+toughness; boss health scales by a smaller factor than raid size (as in Terraria's Expert
+mode) so fights stay about the same length; resource regrowth rises so the group isn't
+starved. Expected run length for co-op: 1–5 days of calendar time. The formulas live in one
+place (`data/difficulty`) and are covered by the balance tools.
+
+## Core loop systems (existing)
+
+Day gathering and building; night raids; nine crocodile types (green melee, yellow fast,
+red fire, blue ice, pink wrecker, brown digger, purple poison, white healer, black
+reviver); turrets in three categories; wine and power (generators, wires); farming, bees,
+worms, fish, kiln, still; pipes and sprinklers; levels and stat points. See `README.md`.
+
+## Boss fights
+
+**One boss per crocodile type (9) plus a final giant boss = 10.** Each is its own extra-long
+night (target 6–10 minutes), inspired by Terraria: telegraphed attacks, distinct phases,
+minions, and a boss that reshapes the map.
+
+### Anatomy of a boss night
+- **Summoned**, not scheduled. The player builds a summoning altar and crafts a summon item
+  from late-tier materials, so *they* choose when to fight. Each boss is gated by the tech
+  and the previous boss.
+- **Phases** change at health thresholds (e.g. 100/66/33%): new attacks, new minion mix,
+  new arena hazards. The boss does a visible, audible phase transition.
+- **Escalation clock:** the longer the night runs, the faster minions spawn and the harder
+  the boss hits, so stalling is punished and "it gets harder as the night goes on" is real.
+- **Minions** are drawn from the boss's crocodile family, spawned in waves by a director.
+- **Retreat rule:** if the player is clearly losing (or all lives are gone) the boss
+  retreats at dawn and heals; the fight can be re-summoned. A bad night never dead-ends a
+  save.
+- **Rewards:** drops that unlock the next tier of towers or automation, plus a first-kill
+  bonus. Boss kills are recorded in the save.
+- Everything is **saveable mid-fight**.
+
+### Roster
+
+| Boss | Signature | How it uses the map |
+|---|---|---|
+| Green | charging brute, ground slams | slams crack and break walls |
+| Yellow | dash with afterimages | skids through bases, trampling traps |
+| Red | fire rain, burn | ignites trees, wood walls, berries |
+| Blue | freezing waves | freezes the pool into walkable ice; locks structures |
+| Pink | demolition | wrecks buildings, hurls rubble |
+| Brown | tunnelling | erupts under the base, undermines walls |
+| Purple | poison | corrupts grass, kills planters |
+| White | heals, shields | shields the boss and minions; cleanses debuffs |
+| Black | revives | brings back dead minions; darkens the map |
+| **Final: the Great Goliradile** | all of the above, in sequence | floods the island, quakes, burns, freezes; 5–6 phases |
+
+Map effects are built once as a **terrain-event system** (burn, freeze, flood, quake,
+corrupt, darken): events apply a reversible change to tiles, are saved with the game, and
+revert on defeat or at dawn. Bosses use the system; they don't edit tiles directly.
+
+## Towers (the Bloons side)
+
+- **Upgrade paths** replace flat stat points: three paths per tower, tiers per path, with a
+  cross-path cap so a tower specialises.
+- **Targeting modes:** first, last, strongest, closest (plus tower-specific modes).
+- **Placement limits** come from tech and difficulty instead of the fixed cap of 5.
+- **Upgrade currency:** boss and croc drops (bones, hides, boss materials), so killing
+  things funds defence.
+- Sell with a partial refund. A tower info panel shows range, targeting and path state.
+- **Fast-forward** (2×/3×) during raids, as in Bloons.
+- Roughly 12–15 tower types at launch (9 exist now).
+
+## Automation (the Factorio side — "lite")
+
+Not a full Factorio. Enough that building a supply chain is a real, satisfying puzzle:
+- Miners on ore deposits, conveyor belts, smelters and assemblers, and **feeders** that
+  deliver ammo and fuel to towers.
+- A power grid with capacity and load (generators and wires exist today).
+- Quality of life: minimap, copy/paste of a blueprint, clear production/throughput readouts.
+- Needs a **bigger map with biomes and ore** (today 50×50; target about 128–200 square) and
+  chunked simulation so the cost doesn't grow with world size.
+
+## Multiplayer (post-launch)
+
+Host-authoritative co-op over Godot's high-level networking, 2–4 players to start. It is not
+built until after single-player launch, but **no new system may assume a single player**:
+state is per-player (`players` list), enemies target the nearest player, and randomness goes
+through a seeded service. See ROADMAP Phase 0 and Phase 7.
+
+## Art, audio, UX (launch requirements)
+
+- Original or properly licensed art, sprites, tiles and animation; no placeholder
+  procedural art in the shipped game.
+- Original or licensed audio: sound effects, per-biome and per-boss music.
+- Onboarding: a guided first day that teaches controls and the loop.
+- Accessibility: rebindable keys, text scaling, colour-blind-safe cues, screen-shake and
+  flash toggles.
+- Controller support is a stretch goal (needed for Steam Deck).
+- Strings are kept in one place so localisation is possible later.
+
+## Technical principles
+
+- Stay on **Godot 4.x / GDScript**. Move hot loops to packed arrays and profile before
+  considering anything else.
+- **Data-driven definitions** for crocodiles, towers, bosses, difficulties, recipes.
+- **Tests gate every PR** (see ROADMAP "Quality gates"). Simulations (`--soak`, `--defense`,
+  and later `--bossfight`) back balance decisions with numbers, but only human playtests
+  judge feel.
+- **Save compatibility:** saves are versioned and migrated; a released save never breaks.
+- Original names, art and audio only. "Inspired by" does not mean copied.
