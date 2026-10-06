@@ -4,6 +4,36 @@ Choices made for Goliradile Isle, with the implication for the plan. `DESIGN.md`
 `ROADMAP.md` already reflect these; this file is the quick reference and the place for what
 is still open. Newest round first.
 
+## Round 6 (business, scope edges)
+
+| ID | Question | Decision | Implication |
+|---|---|---|---|
+| S1 | Price | **$5** (owner's choice) | See the notes below |
+| S2 | Demo | No demo | No Steam Next Fest; rely on wishlists and trailer |
+| S3 | Playtest builds | Direct builds early; Steam Playtest once the store page exists | |
+| S4 | Steam features | Achievements only | Cloud saves, Workshop, leaderboards not at launch |
+| S5 | Hand-craft cost | About 5× the automated cost, about 20 minutes of gathering | Tune in playtests |
+| S6 | Co-op scaling | Raid size first (+60% per extra player, capped), boss HP +35% | Starting numbers for `data/difficulty` |
+| S7 | Content lists | Claude drafts `PLAYER.md`; owner reviews and edits | Before Phase 2b |
+| S8 | Onboarding | Guided first day, then contextual hints | Icon-driven; the game has almost no text |
+| S9 | Tone and text | Almost no text beyond item and UI names | **Replaces** boss intro lines; humour comes from names, art, animation |
+| S10 | Languages | English only; strings in one place | |
+| S11 | Mods | Data-driven so possible later; no Workshop at launch | |
+| S12 | Rights holder | `ssebrobless` for now | `LICENSE` updated; replace with a legal or studio name later |
+| S13 | Telemetry | Local crash logs only | No privacy policy complexity |
+| S14 | Difficulty names | Easy, Normal, Hard | |
+| S15 | Accessibility | All four are must-haves: rebinding, text/UI scaling, colour-blind-safe cues, shake/flash toggles | Croc types need shapes or icons, not only colours |
+| S16 | After launch | Free updates, co-op as a free update, no paid DLC planned | Co-op (Phase 7) is post-1.0 |
+
+Notes to keep in view:
+- **Price versus scope.** At $5 (roughly $3.50 per sale after Steam's cut, before tax) a game
+  with 10 bosses, automation and co-op relies on volume. Price can change at any time before
+  launch; the checkpoints are where to reconsider price or scope.
+- **No demo, no Early Access.** The store page, trailer and wishlists carry discoverability;
+  plan marketing early.
+- **Little text** and **a guided tutorial** pull in opposite directions: the tutorial has to
+  teach with icons, highlights and arrows.
+
 ## Round 5 (progression and endgame)
 
 | ID | Question | Decision | Implication |
@@ -101,29 +131,22 @@ thank-you note, is the owner's call.
 
 ## Open
 
-- **Player power content** (the rules are decided in `DESIGN.md`; the lists are not): the 48
-  perks and their branches; the named gear effects and per-rank values; the ~20 meals and
-  their buffs; ability numbers (cooldowns, durations); the aura stack cap. These go in
-  `PLAYER.md` before Phase 2b, and are tuned by playtest.
-- **Repository visibility (decided: public until the first public build).** Consequence to keep
-  in mind: with no Early Access, the first public build is the 1.0 launch, possibly years away,
-  so design docs, boss ideas and later art and audio will be visible in the meantime, and the
-  proprietary licence does not stop people reading them. Revisit before committing art or
-  audio assets or anything the owner wants unreleased; making the repo private is a GitHub
-  setting only the owner can change.
-- **PR #1 (`will-bogusz`).** Resolved above: not merging, owner decides whether to close it. If
-  anyone other than the owner ever contributes code, a simple contributor agreement is needed
-  before a commercial release.
-- **`PROGRESSION.md`** (tiers, boss order, materials) and **`TOWERS.md`** (roles for the 12
-  towers, upgrade paths) still to be written; the design questions that blocked them are now
-  answered. **`ASSETS.md`** (licence policy and manifest format) is new.
-- **Legal name for the `LICENSE`** copyright line (owner to provide).
+- **Content to draft** (the rules are decided in `DESIGN.md`; the lists are not): `PLAYER.md`
+  (the 48 perks and their branches; named gear effects and per-rank values; the ~20 meals and
+  their buffs; ability numbers; the aura stack cap), `PROGRESSION.md` (tiers by boss),
+  `TOWERS.md` (roles for the 12 towers, upgrade paths), `ASSETS.md` (licence policy and
+  manifest format). Claude drafts, the owner reviews; numbers are tuned in playtests.
+- **Co-op formulas** start from S6 and are finalised in Phase 7.
+- **Repository visibility (decided: public until the first public build).** With no Early
+  Access, the first public build is the 1.0 launch, possibly years away, so design docs, boss
+  ideas and later art and audio will be visible in the meantime, and the proprietary licence
+  does not stop people reading them. Revisit before committing art or audio assets or anything
+  the owner wants unreleased; making the repo private is a GitHub setting only the owner can
+  change.
 - **Trademark and Steam name check** for "Goliradile Isle" (owner task, early).
-- **Co-op scaling formulas** (Phase 7); **price**; how playtesters get builds (default:
-  private builds to invited players); the **hand-craft cost** of summon components. None
-  block Phase 0–2.
+- **Legal or studio name** for the `LICENSE` (placeholder is `ssebrobless`).
+- **PR #1** is closed. If anyone other than the owner ever contributes code, a simple
+  contributor agreement is needed before a commercial release.
 - **Asset sourcing is a risk, not a decision:** open-licensed packs won't cover multi-tile
-  bosses or a coherent style by themselves; expect custom work, and that licences must be
-  checked per asset (no non-commercial or no-derivatives licences).
-- Remaining items marked in `ROADMAP.md` "Decisions we still need": price and platforms, name
-  and trademark, Early Access versus full launch, co-op baseline.
+  bosses or a coherent style by themselves; expect custom work, and licences must be checked
+  per asset (no non-commercial or no-derivatives licences).
