@@ -30,6 +30,18 @@ Public release, sold (target: Steam). **A full 1.0 launch, no Early Access.** Wi
 and Linux; Steam Deck as a stretch goal. Single-player first; co-op after launch (see
 Multiplayer). Before 1.0, only closed playtests with invited players.
 
+- **Price: $5.** No demo. Playtest builds go to friends directly, then through Steam Playtest
+  once the store page exists. Steam features at launch: **achievements only** (no cloud saves,
+  Workshop or leaderboards at launch).
+- **After launch:** free updates (fixes, balance, and **co-op as a free update**); no paid DLC
+  planned.
+- **Mods:** content is data-driven so mods are possible later; no Workshop at launch.
+- **Languages:** English at launch, with all text in one place so translations can be added.
+- **Telemetry:** local crash logs only, nothing sent automatically.
+- Difficulty names stay **Easy, Normal, Hard**.
+- **Tone and text:** almost no text beyond item and UI names; the humour comes from names, art
+  and animation, not dialogue. There are no boss intro lines or cutscenes.
+
 ## Run structure
 
 - A save is created with a **name, a difficulty and a world seed**. Saves are slots; the
@@ -260,9 +272,11 @@ single-player uses the same path co-op will). See ROADMAP Phase 0 and Phase 7.
   16 px packs and edit the rest to match.
 - Audio: free open-licensed music and sound effects under the same policy and manifest;
   music is calm by day, tense by night, with unique boss tracks where available.
-- Onboarding: a guided first day that teaches controls and the loop.
-- Accessibility: rebindable keys, text scaling, colour-blind-safe cues, screen-shake and
-  flash toggles.
+- Onboarding: a **guided first day** that teaches controls and the loop, then contextual
+  hints. With almost no text in the game, the prompts are mostly icons, highlights and arrows.
+- Accessibility **must-haves at launch:** rebindable keys, text and UI scaling,
+  **colour-blind-safe cues** (every croc type also needs a distinct shape or icon, not just
+  a colour), and screen-shake and flash toggles.
 - Keyboard and mouse at launch; **controller support comes after launch** (a separate UI
   project, also needed for a verified Steam Deck release).
 - Strings are kept in one place so localisation is possible later.

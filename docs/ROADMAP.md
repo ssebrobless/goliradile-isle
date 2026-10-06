@@ -227,18 +227,22 @@ factory; performance budgets hold. This is the **Beta**.
 ### Phase 6 — Launch content and polish (10–16 weeks, partly outsourced)
 *Goal: something strangers will pay for.* Several items run in parallel from earlier phases.
 
-- [ ] **6.1 Onboarding:** guided first day and contextual hints.
+- [ ] **6.1 Onboarding:** guided first day and contextual hints, icon- and highlight-driven
+      (the game has almost no text).
 - [ ] **6.2 Art:** curate open-licensed 16 px packs (CC0/CC-BY/permissive; no NC/ND), edit them
       into one coherent look, make the multi-tile boss sprites, replace the procedural
       placeholder art; every asset in the manifest.
 - [ ] **6.3 Audio:** open-licensed sound effects and music (calm day, tense night, boss
       tracks), under the same policy and manifest.
 - [ ] **6.3b Credits:** end-credits screen generated from the manifest (plus the dedication).
-- [ ] **6.4 UX and accessibility:** rebindable keys, text scaling, colour-blind-safe cues,
-      screen-shake and flash toggles, clear settings. (Controller support is post-launch.)
+- [ ] **6.4 UX and accessibility (all four are launch must-haves):** rebindable keys, text and
+      UI scaling, colour-blind-safe cues (a distinct icon or shape per croc type), screen-
+      shake and flash toggles; clear settings. (Controller support is post-launch.)
 - [ ] **6.5 Localisation-ready strings.**
-- [ ] **6.6 Achievements and Steam integration.**
-- [ ] **6.7 Performance and min-spec pass;** crash and error logging.
+- [ ] **6.6 Achievements** (the only Steam feature at launch; cloud saves, Workshop and
+      leaderboards are not planned for launch).
+- [ ] **6.7 Performance and min-spec pass;** local crash and error logs (nothing is sent
+      automatically); a Bug Report button that opens the log folder.
 - [ ] **6.8 Builds:** Windows, macOS (signed and notarised), Linux; automated release
       pipeline.
 - [ ] **6.9 Store and legal:** Steam page (capsule art, trailer, description), EULA/privacy,
@@ -310,6 +314,8 @@ so the plan keeps full scope; the checkpoints are where scope can still be cut.
 | "Fun" can't be simulated | A playtest checkpoint at the end of every phase |
 | Legal (name, assets, music) | Trademark check, licence audit, original assets only |
 | Burnout | Small PRs, visible progress each phase, scope cuts decided at checkpoints |
+| $5 price against a very large scope | Revenue per sale is small (roughly $3.50 after Steam's cut and before tax), so the plan relies on volume and word of mouth; reconsider price or scope at the Phase 4 and 5 checkpoints |
+| No Early Access and no demo | Discoverability depends on the store page, trailer and wishlists alone (a demo is also the way into Steam Next Fest); plan marketing early and use Steam Playtest |
 
 ## Decisions we still need (with my default)
 
@@ -322,7 +328,7 @@ so the plan keeps full scope; the checkpoints are where scope can still be cut.
 | Co-op baseline | **decided: up to 4 players**; formulas in `data/difficulty` |
 | Art direction | **decided:** 16 px tiles, richer sprites, multi-tile bosses |
 | Early Access vs full launch | **decided:** full 1.0, no Early Access |
-| Price and platforms | **platforms decided:** Windows, macOS, Linux; price before the Steam page |
+| Price and platforms | **decided:** $5; Windows, macOS, Linux |
 | Final name | trademark check before the Steam page |
 
 ## Next step
