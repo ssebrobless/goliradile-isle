@@ -81,7 +81,8 @@ in the ladder so nothing already in the game is wasted.
 - **Stations:** kiln (charcoal, metal, glass).
 - **Existing structures:** kiln, bee enclosure, worm habitat, glass jar.
 - **Towers:** Sniper, Adhesive.
-- **Gear:** metal tool; **Green set** (from Green boss materials).
+- **Gear:** metal tool; **Green set** (five pieces) and **Green weapon** (from Green boss
+  materials).
 - **Meals:** honey and fish dishes.
 - **Summon (Yellow):** Green boss drop + a **Wooden Gear** (hand-craft: about 20 minutes of
   gathering; automated later at about one fifth of the cost).

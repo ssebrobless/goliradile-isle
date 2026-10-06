@@ -4,8 +4,7 @@ Status: **draft for owner review.** Every number is a starting proposal, to be t
 simulation tools and playtests. Decisions are in `DECISIONS.md`, rules in `DESIGN.md`
 ("Player power"), tiers in `PROGRESSION.md`, towers in `TOWERS.md`.
 
-**Items marked ⚑ are interpretations I made and want the owner to confirm** (listed at the
-end).
+All points that were interpretations are now **confirmed** (see "Confirmed decisions" at the end).
 
 ## Principles
 
@@ -98,15 +97,18 @@ are capped at **+50%** fire rate or damage.
 | 5 | Alloy | alloy weapons |
 | 7 | Reinforced | reinforced weapons |
 
-### Attunement ⚑
+### Attunement
 
 This is the system that makes levels and gear interact.
 
-- **Every piece of gear carries one named effect** (armour, weapon and accessory effects are
-  listed in the set table below).
+- **Every piece of gear that carries an effect** (chest armour, each accessory, the weapon)
+  has one named effect, listed in the tables below. Head and leg armour give stats and
+  resistance only.
 - The player has **attunement slots**: **1 from the start, a 2nd at level 15, a 3rd at level
   35.** Only the effects of attuned gear are active, so with three slots the player chooses
-  which three of their pieces' effects run. Swapping is free at the workbench or bed.
+  which three effects run. Swapping is free at the workbench or bed.
+- **Set bonuses** (below) apply automatically and **do not use a slot**; they reward wearing a
+  full set.
 - **Rank:** every attuned effect has a rank that rises with player level: **rank I from
   level 1, II at 10, III at 20, IV at 30, V at 40, VI at 50, VII at 60.** Each rank adds
   about 20% of the effect's base strength.
@@ -114,21 +116,46 @@ This is the system that makes levels and gear interact.
 
 ### Boss sets
 
-Each boss drops materials for a set (crafted with biome materials, per `PROGRESSION.md`). A
-set is **three effect-bearing pieces** (armour, weapon, accessory), a **resistance**, and an
-**ability** the set unlocks. The Final boss has no set; its reward is the win.
+Each boss drops materials for a **set of five pieces** and for **one weapon**, crafted with
+biome materials (per `PROGRESSION.md`). The Final boss has no set; its reward is the win.
 
-| Boss | Resistance | Armour effect | Weapon effect | Accessory effect | Ability |
-|---|---|---|---|---|---|
-| Green (Brute) | knockback | **Stonewall** +10% armour near walls | **Cleave** melee hits in an arc | **Brute Charm** +15% max health | **Ground Slam** |
-| Yellow (Dash) | slow and snares | **Lightfoot** +12% move speed | **Quick Strike** attack speed up after a dodge | **Afterimage** dodge leaves a decoy | **Banana Throw** |
-| Red (Cinder) | fire and burn | **Ember Skin** burn immunity | **Ember** hits ignite | **Hearth** towers in aura +fire rate | **Torch Swing** |
-| Blue (Frost) | cold and freeze | **Rime** freeze immunity | **Chill Touch** hits slow | **Frost Core** nearby enemies slowed | **Frost Stomp** |
-| Pink (Wrecker) | structure damage | **Rubble Plate** nearby structures +armour | **Wrecking Ball** hits knock enemies into others | **Mason's Belt** ruins rebuild 30% cheaper | **Wrecking Swing** |
-| Brown (Burrower) | quakes and undermining | **Tunnelhide** ground effects −50% | **Pick** reveals and hits burrowers | **Seismic Sense** burrowers shown on map | **Burrow** |
-| Purple (Toxic) | poison | **Filter Mask** poison immunity | **Venom Tip** hits poison | **Spore Pouch** heals in poison clouds | **Spore Cloud** |
-| White (Mender) | debuffs | **Cleansing Fur** removes a debuff every 10 s | **Mender's Touch** hits heal the nearest ally | **Halo** heals structures in aura | **Mend** |
-| Black (Shade) | darkness | **Shadowcloak** dodge makes you untargetable briefly | **Soul Drinker** kills heal | **Last Light** revive once per boss at 50% | **Shadow Step** |
+- **The five pieces:** **head, chest and legs** (armour) and **two accessories**. Together they
+  fill every gear slot except weapon and tool.
+- **Resistance** is spread across the three armour pieces (wear all three for the full
+  amount).
+- **Effects:** the **chest** carries the set's armour effect, **Accessory A** and **Accessory
+  B** carry one effect each. Head and legs have no effect.
+- **Set bonus:** wearing all five pieces grants an extra effect that needs no attunement slot.
+- **Ability:** the set unlocks one ability (see Abilities).
+- **Weapon:** a separate weapon with its own effect, not part of the set bonus. The weapon
+  family **rotates through the four branches**: boss 1 melee, 2 ranged, 3 gadget, 4 thrown,
+  then repeating, so every branch gets a weapon every four tiers.
+
+| Boss | Resistance | Chest effect | Accessory A | Accessory B | Set bonus (5 pieces) | Ability |
+|---|---|---|---|---|---|---|
+| Green (Brute) | knockback | **Stonewall** +10% armour near walls | **Brute Charm** +15% max health | **Rampage Band** +10% damage above 70% health | **Brute Force** melee deals +20% to stunned enemies | **Ground Slam** |
+| Yellow (Dash) | slow and snares | **Lightfoot** +12% move speed | **Afterimage** dodge leaves a decoy | **Speed Sash** +10% attack speed | **Blur** first hit after a dodge is a free crit | **Banana Throw** |
+| Red (Cinder) | fire and burn | **Ember Skin** burn immunity | **Hearth** towers in aura +fire rate | **Cinder Ring** fire damage taken −20% | **Inferno** small ignite aura around you | **Torch Swing** |
+| Blue (Frost) | cold and freeze | **Rime** freeze immunity | **Frost Core** nearby enemies slowed | **Icicle Pin** hits chill | **Permafrost** standing still builds ice armour | **Frost Stomp** |
+| Pink (Wrecker) | structure damage | **Rubble Plate** nearby structures +armour | **Mason's Belt** ruins rebuild 30% cheaper | **Plumb Line** towers near you take −15% structure damage | **Demolition Expert** one instant ruin rebuild per night | **Wrecking Swing** |
+| Brown (Burrower) | quakes and undermining | **Tunnelhide** ground effects −50% | **Seismic Sense** burrowers shown on map | **Digger's Charm** +20% ore yield | **Earthbound** immune to quakes | **Burrow** |
+| Purple (Toxic) | poison | **Filter Mask** poison immunity | **Spore Pouch** heals in poison clouds | **Antidote Vial** poison ticks 50% slower | **Toxic Bloom** poisoned enemies spread poison | **Spore Cloud** |
+| White (Mender) | debuffs | **Cleansing Fur** removes a debuff every 10 s | **Halo** heals structures in aura | **Mender's Bell** +20% healing received | **Sanctuary** periodic shield for allies and structures | **Mend** |
+| Black (Shade) | darkness | **Shadowcloak** dodge makes you untargetable briefly | **Last Light** revive once per boss at 50% | **Shade Brooch** +10% damage in darkness | **Eclipse** kills may revive a fallen ally or tower | **Shadow Step** |
+
+**Boss weapons** (family rotates):
+
+| Boss | Weapon | Family | Effect |
+|---|---|---|---|
+| Green | **Brute's Club** | melee | **Cleave** hits in an arc |
+| Yellow | **Dash Sling** | ranged | **Quick Strike** attack speed up after a dodge |
+| Red | **Cinder Torch** | gadget | **Ember** hits ignite |
+| Blue | **Frost Bola** | thrown | **Chill Touch** hits slow |
+| Pink | **Wrecker Maul** | melee | **Wrecking Ball** hits knock enemies into others |
+| Brown | **Quake Dart** | ranged | **Seeker** reveals and hits burrowers |
+| Purple | **Spore Blower** | gadget | **Venom Tip** hits poison |
+| White | **Mender's Boomerang** | thrown | **Mender's Touch** hits heal the nearest ally |
+| Black | **Soul Drinker** | melee | **Soul Drain** kills heal |
 
 ## Abilities
 
@@ -209,14 +236,13 @@ abilities.
   simulation of a typical run.
 - No stat, perk or effect may let one build trivialise a tier-appropriate boss.
 
-## Interpretations to confirm ⚑
+## Confirmed decisions
 
-1. **Attunement as player slots.** The decision said "gear has perk slots that levels unlock
-   and strengthen." I read it as: every piece carries one named effect, the player has
-   attunement slots (1, then 2 at level 15, 3 at level 35), and rank rises with level. If you
-   meant each piece has its own slots, say so and I will redo this section.
-2. **Boss-set pieces:** three pieces per set (armour, weapon, accessory) while the player has
-   three armour slots and two accessory slots. Whether sets should fill all slots (for example
-   a helmet, chest and boots plus accessories) is open.
-3. **Perk tier unlock thresholds** (0, 3, 6, 9 points) and the **40% XP rate for tower kills**.
-4. **Ability unlock levels:** War cry at level 8 is a guess.
+1. **Attunement:** every effect-bearing piece has one effect; the player has attunement slots
+   (1, a 2nd at level 15, a 3rd at level 35) that choose which are active; ranks rise with level.
+2. **Boss sets have five pieces** (three armour, two accessories); the **weapon is separate**
+   and its family rotates through the branches.
+3. **Perk tiers unlock at 0, 3, 6 and 9 points** spent in the branch.
+4. **Tower kills give 40% of the XP** of the player's own kills.
+5. **War cry unlocks at level 8.** Dodge roll is available from the start.
+6. **Respawn:** at the player's bed if they have one, otherwise at the workbench.

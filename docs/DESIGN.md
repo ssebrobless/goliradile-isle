@@ -76,7 +76,8 @@ beating a boss unlocks the next tier of gear, towers, automation and meals.
 A save is **never wiped** by dying. Lives apply per night or boss fight, not per run, and
 reset for each: **Easy 5, Normal 3, Hard 2**. Dying on Normal drops about **25% of carried
 materials at the death spot, recoverable**; Easy is cheaper, Hard harsher, and a lost boss
-fight on Hard costs real progress. Equipped gear and the base are never lost. A wipe-on-death
+fight on Hard costs real progress. Equipped gear and the base are never lost. The player
+**respawns at their bed if they have one, otherwise at the workbench**. A wipe-on-death
 "Hardcore" mode may be added later.
 
 ### Threat scaling
@@ -133,13 +134,14 @@ them, so neither replaces the other. Numbers below are starting proposals for tu
   Engineer: gadgets and tools. Survivalist: thrown and trap-style. Perks boost the matching
   family; nothing is locked.
 - **Gear sources:** tech-tier base gear from your tier of the progression; **boss-themed
-  sets** crafted from boss materials, each tied to its croc type (for example the Red set
-  resists fire, the Brown set resists being undermined).
-- **Attunement (how levels and gear interact).** Each piece of gear has perk slots with named
-  effects (for example "Ember"). Player level **unlocks additional slots and raises the rank**
-  of the effects, so the gear gives the effect and the level gives the depth: the **2nd slot
-  at level 15, the 3rd at level 35, and ranks every 10 levels**. The UI shows which level
-  unlocks the next slot or rank.
+  sets of five pieces** (three armour, two accessories) plus **one boss weapon**, crafted from
+  boss materials, each tied to its croc type (for example the Red set resists fire, the Brown
+  set resists being undermined). Weapon families rotate through the four branches.
+- **Attunement (how levels and gear interact).** Each effect-bearing piece of gear carries one
+  named effect (for example "Ember"). The player has **attunement slots** (1 at the start, a
+  **2nd at level 15, a 3rd at level 35**) that choose which effects are active, and **ranks
+  rise every 10 levels**, so the gear gives the effect and the level gives the depth. Set
+  bonuses need no slot. The UI shows which level unlocks the next slot or rank.
 - **Active abilities.** Two or three abilities with cooldowns, unlocked by level and gear.
   The first two are **Dodge roll** (short dash with brief invulnerability) and **War cry**
   (briefly buffs nearby towers). Other abilities, such as Ground slam and Banana throw

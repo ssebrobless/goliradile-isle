@@ -103,7 +103,8 @@ at the checkpoint before it.
       removed fully in 3.1; this lands the player side early.)
 - [ ] **1.8b Lives and death:** lives per night or boss fight (Easy 5, Normal 3, Hard 2),
       reset each; Normal drops about 25% of carried materials at the death spot (recoverable);
-      Easy cheaper, Hard harsher; sleeping rules (bed, hunger cost, not during a raid).
+      Easy cheaper, Hard harsher; respawn at the bed (else the workbench); sleeping rules
+      (bed, hunger cost, not during a raid).
 - [ ] **1.8 Threat anchor:** raid strength driven by bosses defeated plus capped day creep
       (replaces nights survived); death policy per difficulty (never wipes a save; lives per
       night/boss, inventory loss on Normal); difficulty lowerable after creation.
@@ -153,16 +154,17 @@ slice so the Red boss can be the first source of a boss set.
       stats from gear; tech-tier base gear; weapon families that branches favour (not lock).
 - [ ] **2b.2 Perk tree:** perk points, 4 branches of about 12 (Brawler, Marksman,
       Engineer/Commander, Survivalist), free respec at the workbench or bed.
-- [ ] **2b.3 Attunement:** perk slots on gear with named effects; player level unlocks slots
-      and raises ranks; UI shows the next unlock.
+- [ ] **2b.3 Attunement:** each effect-bearing piece has one named effect; the player has
+      attunement slots (1, a 2nd at level 15, a 3rd at level 35) that choose which are active;
+      ranks rise with level; set bonuses need no slot; UI shows the next unlock.
 - [ ] **2b.4 Active abilities:** 2–3 with cooldowns, input, telegraph and sound; unlocked by
       level and gear.
 - [ ] **2b.5 Timed buffs framework:** status effects with durations and icons, shared by food,
       perks and gear.
 - [ ] **2b.6 Cooked meals:** a first set of meals with unique buffs on the existing cooking
       systems; the full list grows through Phases 4 and 6.
-- [ ] **2b.7 First boss set:** the Red set (materials from the Red boss, set effects, one
-      ability) as the template for the rest.
+- [ ] **2b.7 First boss set:** the Red set (five pieces, set bonus, one ability) and the Red
+      weapon (Cinder Torch, a gadget) as the template for the rest.
 - [ ] **2b.8 Balance tooling:** `--bossfight` and `--defense` take a gear/level loadout;
       bands recorded.
 
