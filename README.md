@@ -53,7 +53,7 @@ Supporting docs: [`DECISIONS`](docs/DECISIONS.md) (choices made), [`PROGRESSION`
 (tiers and pacing), [`TOWERS`](docs/TOWERS.md), [`PLAYER`](docs/PLAYER.md) (power, gear, perks,
 meals), [`ASSETS`](docs/ASSETS.md) (art and audio licences), [`ARCHITECTURE`](docs/ARCHITECTURE.md)
 (code structure and the Phase 0 task list), [`BOSSES`](docs/BOSSES.md) (the 10 boss sheets),
-[`PHASES_1_2`](docs/PHASES_1_2.md) (task breakdown for Phases 1 and 2).
+[`PHASES_1_2`](docs/PHASES_1_2.md) (task breakdown for Phases 1 and 2), [`AUTORUN`](docs/AUTORUN.md) (rules and goal text for an unattended run).
 
 ## Building from source
 
