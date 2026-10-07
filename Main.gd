@@ -8560,7 +8560,7 @@ func _run_selftest() -> void:
 	_nights_survived = 0; _init_progression(); _day = 1; _resources = _default_inventory()
 
 	print("SELFTEST DONE, failures=%d" % fails)
-	get_tree().quit()
+	get_tree().quit(1 if fails > 0 else 0)   # non-zero exit lets CI fail the build
 
 
 # Dev affordance: `-- --defense` plays one night per row against a sealed stone base

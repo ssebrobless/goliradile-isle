@@ -1,5 +1,7 @@
 # Goliradile Isle
 
+[![CI](https://github.com/ssebrobless/goliradile-isle/actions/workflows/ci.yml/badge.svg)](https://github.com/ssebrobless/goliradile-isle/actions/workflows/ci.yml)
+
 A top-down pixel-art survival / resource-management / action game built in **Godot 4.6**.
 You're a gorilla on a crocodile-infested island: gather by day, build a base, and
 survive escalating nights. The twist is the tech — recognizable machines (generators,
@@ -51,7 +53,7 @@ Supporting docs: [`DECISIONS`](docs/DECISIONS.md) (choices made), [`PROGRESSION`
 (tiers and pacing), [`TOWERS`](docs/TOWERS.md), [`PLAYER`](docs/PLAYER.md) (power, gear, perks,
 meals), [`ASSETS`](docs/ASSETS.md) (art and audio licences), [`ARCHITECTURE`](docs/ARCHITECTURE.md)
 (code structure and the Phase 0 task list), [`BOSSES`](docs/BOSSES.md) (the 10 boss sheets),
-[`PHASES_1_2`](docs/PHASES_1_2.md) (task breakdown for Phases 1 and 2).
+[`PHASES_1_2`](docs/PHASES_1_2.md) (task breakdown for Phases 1 and 2), [`AUTORUN`](docs/AUTORUN.md) (rules and goal text for an unattended run).
 
 ## Building from source
 
@@ -61,6 +63,17 @@ Open the project in Godot 4.6.x and run `Main.tscn`, or export via the included
 ```
 godot --headless --path . -- --selftest
 ```
+
+It exits non-zero if any test fails. CI (`.github/workflows/ci.yml`) runs the self-test plus
+the balance table, soak and defense simulations on every pull request and compares them with
+`ci/baselines.json`. To run the same checks locally:
+
+```
+GODOT=/path/to/godot ci/run_checks.sh
+```
+
+After an intentional balance change, refresh the exact balance baseline with
+`GODOT=... ci/run_checks.sh --update-balance` and commit `ci/baselines.json`.
 
 Other dev flags: `-- --balance` prints how raids scale per night; `-- --soak [--runs=N --secs=S]`
 simulates raids against random bases and reports stuck crocs; `-- --shot out.png --demo --drawtime`

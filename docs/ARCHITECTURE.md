@@ -260,6 +260,10 @@ passes before and after, and the tool outputs (soak, defense, balance) match the
 
 ## 11. Phase 0 task breakdown
 
+**Progress:** P0-01 (CI skeleton) and P0-02 (baselines) are done. CI runs `ci/run_checks.sh`:
+selftest, the balance table (exact), soak (bands) and defense (bands); performance gates for
+draw and path costs arrive with P0-17.
+
 Size: S about a day or less, M a few days, L about a week or more, in focused work. Each task
 is one PR (large ones several). **Acceptance** is what must be true to merge.
 
